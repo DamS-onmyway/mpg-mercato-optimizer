@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MPG Mercato Optimizer</title>
+
+<style>
+:root{
+    --bg:#0b1020;
+    --card:#151c32;
+    --card2:#1d2742;
+    --text:#f5f7ff;
+    --muted:#9da8c5;
+    --green:#37d67a;
+    --orange:#ffb84d;
+    --red:#ff5d6c;
+    --blue:#5da9ff;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background:linear-gradient(180deg,#080c18,#10182b);
+    color:var(--text);
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:16px;
+}
+
+header{
+    background:linear-gradient(135deg,#17254a,#243b78);
+    border-radius:20px;
+    padding:22px;
+    margin-bottom:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
+header h1{
+    margin:0 0 6px;
+    font-size:26px;
+}
+
+header p{
+    margin:0;
+    color:#cbd5f5;
+}
+
+.card{
+    background:var(--card);
+    border:1px solid #273252;
+    border-radius:18px;
+    padding:18px;
+    margin-bottom:16px;
+}
+
+.card h2{
+    margin-top:0;
+    font-size:19px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+}
+
+label{
+    display:block;
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:5px;
+}
+
+input,select{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #35415f;
+    background:#0e1527;
+    color:white;
+    font-size:15px;
+}
+
+button{
+    border:0;
+    border-radius:12px;
+    padding:13px 16px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.primary{
+    background:var(--green);
+    color:#07130c;
+    width:100%;
+    margin-top:14px;
+}
+
+.filters{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.player{
+    background:var(--card2);
+    border-radius:15px;
+    padding:15px;
+    margin-top:10px;
+}
+
+.player-top{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+}
+
+.player-name{
+    font-weight:bold;
+    font-size:17px;
+}
+
+.club{
+    color:var(--muted);
+    font-size:13px;
+    margin-top:4px;
+}
+
+.badge{
+    padding:5px 8px;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:bold;
+}
+
+.S{
+    background:#9c5cff;
+}
+
+.Aplus{
+    background:#2f9cff;
+}
+
+.A{
+    background:#37a86d;
+}
+
+.B{
+    background:#8a7d48;
+}
+
+.C{
+    background:#6a4050;
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin-top:13px;
+}
+
+.stat{
+    background:#11182b;
+    border-radius:10px;
+    padding:9px;
+    text-align:center;
+}
+
+.stat small{
+    display:block;
+    color:var(--muted);
+    font-size:10px;
+}
+
+.stat strong{
+    display:block;
+    margin-top:3px;
+}
+
+.bid{
+    margin-top:13px;
+    padding:12px;
+    background:#11182b;
+    border-radius:12px;
+}
+
+.good{
+    color:var(--green);
+}
+
+.warning{
+    color:var(--orange);
+}
+
+.danger{
+    color:var(--red);
+}
+
+.footer{
+    color:var(--muted);
+    text-align:center;
+    font-size:12px;
+    padding:20px 0;
+}
+
+@media(max-width:600px){
+    .grid,
+    .filters{
+        grid-template-columns:1fr;
+    }
+
+    header h1{
+        font-size:22px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<header>
+    <h1>⚽ MPG Mercato Optimizer</h1>
+    <p>Assistant de mercato — Ligue 1 2026/2027</p>
+</header>
+
+<div class="card">
+    <h2>⚙️ Configuration</h2>
+
+    <div class="grid">
+
+        <div>
+            <label>Ton budget (€M)</label>
+            <input id="budget" type="number" value="500">
+        </div>
+
+        <div>
+            <label>Nombre de managers</label>
+            <input id="managers" type="number" value="10">
+        </div>
+
+    </div>
+
+    <button class="primary" onclick="analyser()">
+        🚀 Lancer l'analyse
+    </button>
+</div>
+
+<div class="card">
+    <h2>🎯 Recherche</h2>
+
+    <div class="filters">
+
+        <div>
+            <label>Poste</label>
+            <select id="poste" onchange="afficherJoueurs()">
+                <option value="ALL">Tous</option>
+                <option value="G">Gardiens</option>
+                <option value="D">Défenseurs</option>
+                <option value="M">Milieux</option>
+                <option value="A">Attaquants</option>
+            </select>
+        </div>
+
+        <div>
+            <label>Recherche</label>
+            <input
+                id="recherche"
+                type="text"
+                placeholder="Nom ou club..."
+                oninput="afficherJoueurs()"
+            >
+        </div>
+
+    </div>
+</div>
+
+<div id="resultats"></div>
+
+<div class="card">
+    <h2>💡 Comment fonctionne l'outil ?</h2>
+
+    <p>
+        L'application compare la valeur théorique d'un joueur
+        avec son prix probable aux enchères.
+    </p>
+
+    <p>
+        🟢 <b>Bonne affaire</b> : valeur supérieure au prix attendu.
+    </p>
+
+    <p>
+        🟠 <b>Attention</b> : joueur intéressant mais risque de
+        surpayer.
+    </p>
+
+    <p>
+        🔴 <b>À éviter</b> : prix probable supérieur à la valeur.
+    </p>
+</div>
+
+<div class="footer">
+    MPG Mercato Optimizer — Version 1
+</div>
+
+</div>
+
+<script>
+
+const joueurs = [
+
+{
+nom:"Joueur Premium A",
+club:"PSG",
+poste:"A",
+note:7.5,
+temps:95,
+buts:90,
+passes:80,
+regularite:90,
+prix:55,
+nouveau:false
+},
+
+{
+nom:"Joueur Premium B",
+club:"Monaco",
+poste:"M",
+note:7.2,
+temps:90,
+buts:70,
+passes:85,
+regularite:86,
+prix:38,
+nouveau:true
+},
+
+{
+nom:"Pépite C",
+club:"Lille",
+poste:"M",
+note:7.0,
+temps:82,
+buts:62,
+passes:76,
+regularite:80,
+prix:21,
+nouveau:true
+},
+
+{
+nom:"Défenseur D",
+club:"Rennes",
+poste:"D",
+note:6.9,
+temps:91,
+buts:30,
+passes:35,
+regularite:83,
+prix:18,
+nouveau:true
+},
+
+{
+nom:"Défenseur E",
+club:"Strasbourg",
+poste:"D",
+note:6.8,
+temps:88,
+buts:25,
+passes:40,
+regularite:78,
+prix:14,
+nouveau:false
+},
+
+{
+nom:"Gardien F",
+club:"Lyon",
+poste:"G",
+note:6.9,
+temps:95,
+buts:0,
+passes:5,
+regularite:84,
+prix:16,
+nouveau:true
+},
+
+{
+nom:"Attaquant G",
+club:"Rennes",
+poste:"A",
+note:6.9,
+temps:84,
+buts:74,
+passes:51,
+regularite:76,
+prix:27,
+nouveau:true
+},
+
+{
+nom:"Milieu H",
+club:"Paris FC",
+poste:"M",
+note:6.8,
+temps:80,
+buts:48,
+passes:70,
+regularite:75,
+prix:12,
+nouveau:true
+
+}
+
+];
+
+
+function score(j){
+
+    return (
+        j.note * 8 +
+        j.temps * 0.20 +
+        j.buts * 0.20 +
+        j.passes * 0.12 +
+        j.regularite * 0.15
+    );
+}
+
+
+function valeur(j){
+
+    return Math.round(score(j) * 0.42);
+}
+
+
+function prixAttendu(j){
+
+    const v = valeur(j);
+
+    let inflation = 1.05;
+
+    if(j.poste === "A")
+        inflation = 1.18;
+
+    if(j.poste === "M")
+        inflation = 1.12;
+
+    if(j.nouveau)
+        inflation += 0.05;
+
+    return Math.round(
+        Math.max(j.prix, v * inflation * 0.65)
+    );
+}
+
+
+function enchereMax(j){
+
+    const v = valeur(j);
+    const p = prixAttendu(j);
+
+    let max = p * 1.12;
+
+    if(v > p * 1.3)
+        max = p * 1.25;
+
+    if(v < p)
+        max = p * 0.9;
+
+    return Math.round(max);
+}
+
+
+function priorite(j){
+
+    const v = valeur(j);
+    const p = prixAttendu(j);
+
+    const ratio = v / p;
+
+    if(ratio >= 1.45)
+        return ["S","S"];
+
+    if(ratio >= 1.25)
+        return ["A+","Aplus"];
+
+    if(ratio >= 1.05)
+        return ["A","A"];
+
+    if(ratio >= .90)
+        return ["B","B"];
+
+    return ["C","C"];
+}
+
+
+function afficherJoueurs(){
+
+    const poste = document.getElementById("poste").value;
+
+    const recherche =
+        document.getElementById("recherche")
+        .value
+        .toLowerCase();
+
+    let liste = joueurs.filter(j => {
+
+        const okPoste =
+            poste === "ALL" ||
+            j.poste === poste;
+
+        const okRecherche =
+            j.nom.toLowerCase().includes(recherche) ||
+            j.club.toLowerCase().includes(recherche);
+
+        return okPoste && okRecherche;
+
+    });
+
+    liste.sort(
+        (a,b) =>
+        valeur(b)/prixAttendu(b) -
+        valeur(a)/prixAttendu(a)
+    );
+
+    const zone =
+        document.getElementById("resultats");
+
+    zone.innerHTML = "";
+
+    liste.forEach(j => {
+
+        const v = valeur(j);
+        const p = prixAttendu(j);
+        const max = enchereMax(j);
+
+        const pr = priorite(j);
+
+        const ratio =
+            (v/p).toFixed(2);
+
+        zone.innerHTML += `
+
+        <div class="player">
+
+            <div class="player-top">
+
+                <div>
+                    <div class="player-name">
+                        ${j.nom}
+                    </div>
+
+                    <div class="club">
+                        ${j.club}
+                        • ${j.poste}
+                        ${j.nouveau ? " • 🆕 2026/27" : ""}
+                    </div>
+                </div>
+
+                <div class="badge ${pr[1]}">
+                    ${pr[0]}
+                </div>
+
+            </div>
+
+            <div class="stats">
+
+                <div class="stat">
+                    <small>Score</small>
+                    <strong>${score(j).toFixed(1)}</strong>
+                </div>
+
+                <div class="stat">
+                    <small>Valeur</small>
+                    <strong>${v} M€</strong>
+                </div>
+
+                <div class="stat">
+                    <small>Prix attendu</small>
+                    <strong>${p} M€</strong>
+                </div>
+
+            </div>
+
+            <div class="bid">
+
+                🎯 <b>Enchère conseillée :</b>
+                <span class="good">
+                    ${Math.min(max, p + 4)} M€
+                </span>
+                <br>
+
+                🔴 <b>Plafond :</b>
+                <span class="warning">
+                    ${max} M€
+                </span>
+                <br>
+
+                📊 Rapport valeur/prix :
+                <b>${ratio}</b>
+
+            </div>
+
+        </div>
+
+        `;
+
+    });
+
+}
+
+
+function analyser(){
+
+    const budget =
+        Number(
+            document.getElementById("budget").value
+        );
+
+    const managers =
+        Number(
+            document.getElementById("managers").value
+        );
+
+    alert(
+        "Analyse lancée !\n\n" +
+        "Budget : " + budget + " M€\n" +
+        "Managers : " + managers
+    );
+
+    afficherJoueurs();
+
+}
+
+
+afficherJoueurs();
+
+</script>
+
+</body>
+</html>
