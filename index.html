@@ -693,6 +693,42 @@ function analyser(){
 }
 
 
+function mettreAJourEtatLigue(){
+
+    const managers =
+        ligue.managersData.length;
+
+    const joueursAttribues =
+        ligue.managersData.reduce(
+            (total, manager) =>
+                total + manager.joueurs.length,
+            0
+        );
+
+    const joueursDisponibles =
+        joueurs.filter(j => {
+
+            return !ligue.managersData.some(
+                manager =>
+                    manager.joueurs.includes(j.nom)
+            );
+
+        }).length;
+
+    document.getElementById("ligueManagers")
+        .textContent = managers;
+
+    document.getElementById("ligueBudget")
+        .textContent = ligue.budgetInitial + " M€";
+
+    document.getElementById("joueursAttribues")
+        .textContent = joueursAttribues;
+
+    document.getElementById("joueursDisponibles")
+        .textContent = joueursDisponibles;
+}
+
+mettreAJourEtatLigue();
 afficherJoueurs();
 
 </script>
