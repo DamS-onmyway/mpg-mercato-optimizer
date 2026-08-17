@@ -2,797 +2,167 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MPG Mercato Optimizer</title>
-
 <style>
-:root{
-    --bg:#0b1020;
-    --card:#151c32;
-    --card2:#1d2742;
-    --text:#f5f7ff;
-    --muted:#9da8c5;
-    --green:#37d67a;
-    --orange:#ffb84d;
-    --red:#ff5d6c;
-    --blue:#5da9ff;
-}
-
-*{
-    box-sizing:border-box;
-}
-
-body{
-    margin:0;
-    font-family:Arial,Helvetica,sans-serif;
-    background:linear-gradient(180deg,#080c18,#10182b);
-    color:var(--text);
-}
-
-.container{
-    max-width:900px;
-    margin:auto;
-    padding:16px;
-}
-
-header{
-    background:linear-gradient(135deg,#17254a,#243b78);
-    border-radius:20px;
-    padding:22px;
-    margin-bottom:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,.3);
-}
-
-header h1{
-    margin:0 0 6px;
-    font-size:26px;
-}
-
-header p{
-    margin:0;
-    color:#cbd5f5;
-}
-
-.card{
-    background:var(--card);
-    border:1px solid #273252;
-    border-radius:18px;
-    padding:18px;
-    margin-bottom:16px;
-}
-
-.card h2{
-    margin-top:0;
-    font-size:19px;
-}
-
-.grid{
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:12px;
-}
-
-label{
-    display:block;
-    color:var(--muted);
-    font-size:13px;
-    margin-bottom:5px;
-}
-
-input,select{
-    width:100%;
-    padding:12px;
-    border-radius:10px;
-    border:1px solid #35415f;
-    background:#0e1527;
-    color:white;
-    font-size:15px;
-}
-
-button{
-    border:0;
-    border-radius:12px;
-    padding:13px 16px;
-    font-weight:bold;
-    cursor:pointer;
-}
-
-.primary{
-    background:var(--green);
-    color:#07130c;
-    width:100%;
-    margin-top:14px;
-}
-
-.filters{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
-}
-
-.player{
-    background:var(--card2);
-    border-radius:15px;
-    padding:15px;
-    margin-top:10px;
-}
-
-.player-top{
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-}
-
-.player-name{
-    font-weight:bold;
-    font-size:17px;
-}
-
-.club{
-    color:var(--muted);
-    font-size:13px;
-    margin-top:4px;
-}
-
-.badge{
-    padding:5px 8px;
-    border-radius:8px;
-    font-size:12px;
-    font-weight:bold;
-}
-
-.S{
-    background:#9c5cff;
-}
-
-.Aplus{
-    background:#2f9cff;
-}
-
-.A{
-    background:#37a86d;
-}
-
-.B{
-    background:#8a7d48;
-}
-
-.C{
-    background:#6a4050;
-}
-
-.stats{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:8px;
-    margin-top:13px;
-}
-
-.stat{
-    background:#11182b;
-    border-radius:10px;
-    padding:9px;
-    text-align:center;
-}
-
-.stat small{
-    display:block;
-    color:var(--muted);
-    font-size:10px;
-}
-
-.stat strong{
-    display:block;
-    margin-top:3px;
-}
-
-.bid{
-    margin-top:13px;
-    padding:12px;
-    background:#11182b;
-    border-radius:12px;
-}
-
-.good{
-    color:var(--green);
-}
-
-.warning{
-    color:var(--orange);
-}
-
-.danger{
-    color:var(--red);
-}
-
-.footer{
-    color:var(--muted);
-    text-align:center;
-    font-size:12px;
-    padding:20px 0;
-}
-
-@media(max-width:600px){
-    .grid,
-    .filters{
-        grid-template-columns:1fr;
-    }
-
-    header h1{
-        font-size:22px;
-    }
-}
+:root{--card:#151c32;--card2:#1d2742;--text:#f5f7ff;--muted:#9da8c5;--green:#37d67a;--orange:#ffb84d;--red:#ff5d6c}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#080c18,#10182b);color:var(--text)}
+.container{max-width:900px;margin:auto;padding:16px}header{background:linear-gradient(135deg,#17254a,#243b78);border-radius:20px;padding:22px;margin-bottom:16px}
+header h1{margin:0 0 6px;font-size:26px}header p{margin:0;color:#cbd5f5}.card{background:var(--card);border:1px solid #273252;border-radius:18px;padding:18px;margin-bottom:16px}.card h2{margin-top:0;font-size:19px}
+.grid,.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;color:var(--muted);font-size:13px;margin-bottom:5px}
+input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #35415f;background:#0e1527;color:#fff;font-size:15px}
+button{border:0;border-radius:12px;padding:13px 16px;font-weight:bold;cursor:pointer}.primary{background:var(--green);color:#07130c;width:100%;margin-top:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:#11182b;border-radius:10px;padding:9px;text-align:center}.stat small{display:block;color:var(--muted);font-size:10px}.stat strong{display:block;margin-top:3px}
+.bid{margin-top:13px;padding:12px;background:#11182b;border-radius:12px}.good{color:var(--green)}.warning{color:var(--orange)}.danger{color:var(--red)}
+.player{background:var(--card2);border-radius:15px;padding:15px;margin-top:10px}.player-top{display:flex;justify-content:space-between;gap:10px}.player-name{font-weight:bold;font-size:17px}.club{color:var(--muted);font-size:13px;margin-top:4px}
+.badge{padding:5px 8px;border-radius:8px;font-size:12px;font-weight:bold}.S{background:#9c5cff}.Aplus{background:#2f9cff}.A{background:#37a86d}.B{background:#8a7d48}.C{background:#6a4050}
+.player .stats{margin-top:13px}.import-help{background:#11182b;border-radius:12px;padding:12px;margin-top:10px;color:#cbd5f5;font-size:13px;line-height:1.5}.import-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.secondary{background:#293758;color:#fff}.danger-btn{background:#5b2630;color:#fff}.status{margin-top:10px;padding:10px 12px;border-radius:10px;background:#11182b;font-size:14px}.ok{border-left:4px solid var(--green)}.error{border-left:4px solid var(--red)}.warn{border-left:4px solid var(--orange)}
+.footer{color:var(--muted);text-align:center;font-size:12px;padding:20px 0}@media(max-width:600px){.grid,.filters{grid-template-columns:1fr}header h1{font-size:22px}}
 </style>
 </head>
+<body><div class="container">
 
-<body>
+<header><h1>⚽ MPG Mercato Optimizer</h1><p>Assistant de mercato — Ligue 1 2026/2027</p></header>
 
-<div class="container">
+<div class="card"><h2>🏆 État de la ligue</h2><div class="stats">
+<div class="stat"><small>Managers</small><strong id="ligueManagers">10</strong></div>
+<div class="stat"><small>Budget initial</small><strong id="ligueBudget">500 M€</strong></div>
+<div class="stat"><small>Joueurs attribués</small><strong id="joueursAttribues">0</strong></div>
+</div><div class="bid">🔓 <b>Joueurs disponibles :</b> <span class="good" id="joueursDisponibles">0</span></div></div>
 
-<header>
-    <h1>⚽ MPG Mercato Optimizer</h1>
-    <p>Assistant de mercato — Ligue 1 2026/2027</p>
-</header>
+<div class="card"><h2>⚙️ Configuration</h2><div class="grid">
+<div><label>Ton budget (€M)</label><input id="budget" type="number" value="500"></div>
+<div><label>Nombre de managers</label><input id="managers" type="number" value="10"></div>
+</div><button class="primary" onclick="analyser()">🚀 Lancer l'analyse</button></div>
 
-<div class="card">
-    <h2>🏆 État de la ligue</h2>
+<div class="card"><h2>🎯 Recherche</h2><div class="filters">
+<div><label>Poste</label><select id="poste" onchange="afficherJoueurs()"><option value="ALL">Tous</option><option value="G">Gardiens</option><option value="D">Défenseurs</option><option value="M">Milieux</option><option value="A">Attaquants</option></select></div>
+<div><label>Recherche</label><input id="recherche" placeholder="Nom ou club..." oninput="afficherJoueurs()"></div>
+</div></div>
 
-    <div class="stats">
-
-        <div class="stat">
-            <small>Managers</small>
-            <strong id="ligueManagers">10</strong>
-        </div>
-
-        <div class="stat">
-            <small>Budget initial</small>
-            <strong id="ligueBudget">500 M€</strong>
-        </div>
-
-        <div class="stat">
-            <small>Joueurs attribués</small>
-            <strong id="joueursAttribues">0</strong>
-        </div>
-
-    </div>
-
-    <div class="bid">
-        🔓 <b>Joueurs disponibles :</b>
-        <span class="good" id="joueursDisponibles">0</span>
-    </div>
+<div class="card"><h2>📥 Importer le catalogue MPG</h2>
+<p style="color:#cbd5f5;font-size:14px">Importe les joueurs depuis CSV, TSV ou JSON. <b>Les 10 managers, leurs budgets et leurs effectifs ne sont jamais modifiés par l'import.</b></p>
+<div class="grid">
+<div><label>Fichier catalogue</label><input id="catalogueFile" type="file" accept=".csv,.tsv,.txt,.json,text/csv,application/json"></div>
+<div><label>Mode d'import</label><select id="importMode"><option value="upsert">Ajouter / mettre à jour</option><option value="replace">Remplacer le catalogue</option></select></div>
 </div>
-    
-<div class="card">
-    <h2>⚙️ Configuration</h2>
-
-    <div class="grid">
-
-        <div>
-            <label>Ton budget (€M)</label>
-            <input id="budget" type="number" value="500">
-        </div>
-
-        <div>
-            <label>Nombre de managers</label>
-            <input id="managers" type="number" value="10">
-        </div>
-
-    </div>
-
-    <button class="primary" onclick="analyser()">
-        🚀 Lancer l'analyse
-    </button>
-</div>
-
-<div class="card">
-    <h2>🎯 Recherche</h2>
-
-    <div class="filters">
-
-        <div>
-            <label>Poste</label>
-            <select id="poste" onchange="afficherJoueurs()">
-                <option value="ALL">Tous</option>
-                <option value="G">Gardiens</option>
-                <option value="D">Défenseurs</option>
-                <option value="M">Milieux</option>
-                <option value="A">Attaquants</option>
-            </select>
-        </div>
-
-        <div>
-            <label>Recherche</label>
-            <input
-                id="recherche"
-                type="text"
-                placeholder="Nom ou club..."
-                oninput="afficherJoueurs()"
-            >
-        </div>
-
-    </div>
-</div>
+<button class="primary" onclick="importerCatalogue()">📥 Importer</button>
+<div class="import-help"><b>Colonnes reconnues :</b> <code>nom</code>, <code>club</code>, <code>poste</code>, <code>coteMPG</code>, <code>prixMPG</code>, <code>note</code>, <code>temps</code>, <code>buts</code>, <code>passes</code>, <code>regularite</code>, <code>nouveau</code>.<br>Les majuscules, accents, espaces et séparateurs usuels sont tolérés.</div>
+<div class="import-actions"><button class="secondary" onclick="telechargerModeleCSV()">⬇️ Modèle CSV</button><button class="secondary" onclick="exporterCatalogue()">💾 Exporter</button><button class="danger-btn" onclick="effacerCatalogue()">🗑️ Effacer le catalogue</button></div>
+<div id="importStatus" class="status" style="display:none"></div></div>
 
 <div id="resultats"></div>
 
-<div class="card">
-    <h2>💡 Comment fonctionne l'outil ?</h2>
+<div class="card"><h2>💡 Comment fonctionne l'outil ?</h2>
+<p>L'application compare la valeur théorique d'un joueur avec son prix probable aux enchères.</p>
+<p>🟢 <b>Bonne affaire</b> : valeur supérieure au prix attendu.</p><p>🟠 <b>Attention</b> : joueur intéressant mais risque de surpayer.</p><p>🔴 <b>À éviter</b> : prix probable supérieur à la valeur.</p></div>
 
-    <p>
-        L'application compare la valeur théorique d'un joueur
-        avec son prix probable aux enchères.
-    </p>
-
-    <p>
-        🟢 <b>Bonne affaire</b> : valeur supérieure au prix attendu.
-    </p>
-
-    <p>
-        🟠 <b>Attention</b> : joueur intéressant mais risque de
-        surpayer.
-    </p>
-
-    <p>
-        🔴 <b>À éviter</b> : prix probable supérieur à la valeur.
-    </p>
-</div>
-
-<div class="footer">
-    MPG Mercato Optimizer — V1 catalogue 2026/27
-    <br>
-    Catalogue clubs public • Données MPG à synchroniser à la réouverture de la ligue
-</div>
-
+<div class="footer">MPG Mercato Optimizer — V1 catalogue 2026/27<br>Les données importées restent dans le navigateur tant que la page est ouverte.</div>
 </div>
 
 <script>
+/* DONNÉES DE LIGUE : NE PAS MODIFIER LORS D'UN IMPORT */
+const ligue={nom:"Ma Ligue MPG",saison:"2026/2027",managers:10,budgetInitial:500,managersData:[
+{nom:"Brest In Peace",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"Arjustin",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"Tatitutonbatou",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"ASPTT Los Bandidos",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"FC Grody",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"Gens Bon",budgetInitial:500,budget:500,joueurs:[
+"Brice Samba","Illia Zabarnyi","Gautier Lloris","Willian Pacho","Alexsandro Ribeiro","Matthieu Udol","Moussa Niakhaté","Alidu Seidu","Ruben Kluivert","Telli Siwe",
+"Denis Zakaria","Moses Simon","Aron Dønnum","Benjamin André","Pape Diop","Haris Belkebla","Lasso Coulibaly",
+"Odsonne Édouard","Florian Sotoca","Lassine Sinayoko","Breel Embolo","Issa Soumaré","Aiyegun Tosin","Josué Casimir"]},
+{nom:"L’Impact de Xavireal",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"Fulham de Bayonne",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"Borussia Footix",budgetInitial:500,budget:500,joueurs:[]},
+{nom:"BF Bison",budgetInitial:500,budget:500,joueurs:[]}
+]};
 
-const ligue = {
-    nom: "Ma Ligue MPG",
-    saison: "2026/2027",
-    managers: 10,
-    budgetInitial: 500,
+/* Catalogue séparé : l'import ne touche jamais managersData. */
+let joueurs=[];
 
-    managersData: [
-    {
-        nom: "Brest In Peace",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "Arjustin",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "Tatitutonbatou",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "ASPTT Los Bandidos",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "FC Grody",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "Gens Bon",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: [
-    "Brice Samba",
+function norm(v){return String(v??"").replace(/^\uFEFF/,"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")}
+function key(v){return norm(v).replace(/[^a-z0-9]/g,"")}
+function num(v){if(v==null||String(v).trim()==="")return null;const n=Number(String(v).trim().replace(",","."));return Number.isFinite(n)?n:null}
+function bool(v){if(typeof v==="boolean")return v;return ["true","1","oui","yes","y","vrai","x"].includes(norm(v))}
+function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
-    "Illia Zabarnyi",
-    "Gautier Lloris",
-    "Willian Pacho",
-    "Alexsandro Ribeiro",
-    "Matthieu Udol",
-    "Moussa Niakhaté",
-    "Alidu Seidu",
-    "Ruben Kluivert",
-    "Telli Siwe",
-
-    "Denis Zakaria",
-    "Moses Simon",
-    "Aron Dønnum",
-    "Benjamin André",
-    "Pape Diop",
-    "Haris Belkebla",
-    "Lasso Coulibaly",
-
-    "Odsonne Édouard",
-    "Florian Sotoca",
-    "Lassine Sinayoko",
-    "Breel Embolo",
-    "Issa Soumaré",
-    "Aiyegun Tosin",
-    "Josué Casimir"
-    ]
-    },
-    {
-        nom: "L’Impact de Xavireal",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "Fulham de Bayonne",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "Borussia Footix",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    },
-    {
-        nom: "BF Bison",
-        budgetInitial: 500,
-        budget: 500,
-        joueurs: []
-    }
-]
-};
-
-const joueurs = [];
-
-// Catalogue clubs 2026/27 — base publique.
-// Les joueurs individuels et les cotes MPG seront injectés lorsque la ligue sera ouverte.
-const catalogueClubs = [('Angers SCO', 'ANG'), ('AJ Auxerre', 'AJA'), ('Stade Brestois 29', 'BRE'), ('Le Havre AC', 'HAC'), ('Le Mans FC', 'LM'), ('RC Lens', 'LEN'), ('LOSC Lille', 'LIL'), ('FC Lorient', 'LOR'), ('Olympique Lyonnais', 'OL'), ('Olympique de Marseille', 'OM'), ('AS Monaco', 'MON'), ('OGC Nice', 'NIC'), ('Paris FC', 'PFC'), ('Paris Saint-Germain', 'PSG'), ('Stade Rennais FC', 'REN'), ('RC Strasbourg Alsace', 'RCS'), ('Toulouse FC', 'TFC'), ('ESTAC Troyes', 'TRO')];
-
-// Add a small migration layer so existing manager rosters continue to work even
-// before individual catalogue entries have been entered.
-function joueurCatalogue(nom){
-    return joueurs.find(j => j.nom.toLowerCase() === nom.toLowerCase());
-}
-
-
-
-function score(j){
-
-    // Tant que les données MPG réelles ne sont pas disponibles,
-    // on n'invente aucune note.
-    if(
-        j.note == null ||
-        j.temps == null ||
-        j.buts == null ||
-        j.passes == null ||
-        j.regularite == null
-    ){
-        return null;
-    }
-
-    return (
-        j.note * 8 +
-        j.temps * 0.20 +
-        j.buts * 0.20 +
-        j.passes * 0.12 +
-        j.regularite * 0.15
-    );
-}
-
-
-function valeur(j){
-
-    const s = score(j);
-
-    if(s == null)
-        return null;
-
-    return Math.round(s * 0.42);
-}
-
-
-function prixAttendu(j){
-
-    const v = valeur(j);
-
-    if(v == null || j.prix == null)
-        return null;
-
-    let inflation = 1.05;
-
-    if(j.poste === "A")
-        inflation = 1.18;
-
-    if(j.poste === "M")
-        inflation = 1.12;
-
-    if(j.nouveau)
-        inflation += 0.05;
-
-    return Math.round(
-        Math.max(j.prix, v * inflation * 0.65)
-    );
-}
-
-
-function enchereMax(j){
-
-    const v = valeur(j);
-    const p = prixAttendu(j);
-
-    if(v == null || p == null)
-        return null;
-
-    let max = p * 1.12;
-
-    if(v > p * 1.3)
-        max = p * 1.25;
-
-    if(v < p)
-        max = p * 0.9;
-
-    return Math.round(max);
-}
-
-
-function priorite(j){
-
-    const v = valeur(j);
-    const p = prixAttendu(j);
-
-    if(v == null || p == null)
-        return ["—","B"];
-
-    const ratio = v / p;
-
-    if(ratio >= 1.45)
-        return ["S","S"];
-
-    if(ratio >= 1.25)
-        return ["A+","Aplus"];
-
-    if(ratio >= 1.05)
-        return ["A","A"];
-
-    if(ratio >= .90)
-        return ["B","B"];
-
-    return ["C","C"];
-}
-
+function joueurEstAttribue(j){return ligue.managersData.some(m=>m.joueurs.some(n=>norm(n)===norm(j.nom)))}
+function score(j){if([j.note,j.temps,j.buts,j.passes,j.regularite].some(v=>v==null))return null;return j.note*8+j.temps*.20+j.buts*.20+j.passes*.12+j.regularite*.15}
+function valeur(j){const s=score(j);return s==null?null:Math.round(s*.42)}
+function prixAttendu(j){const v=valeur(j),base=j.prixMPG??j.prix;if(v==null||base==null)return null;let inf=1.05;if(j.poste==="A")inf=1.18;if(j.poste==="M")inf=1.12;if(j.nouveau)inf+=.05;return Math.round(Math.max(base,v*inf*.65))}
+function enchereMax(j){const v=valeur(j),p=prixAttendu(j);if(v==null||p==null)return null;let m=p*1.12;if(v>p*1.3)m=p*1.25;if(v<p)m=p*.9;return Math.round(m)}
+function priorite(j){const v=valeur(j),p=prixAttendu(j);if(v==null||p==null)return["—","B"];const r=v/p;if(r>=1.45)return["S","S"];if(r>=1.25)return["A+","Aplus"];if(r>=1.05)return["A","A"];if(r>=.9)return["B","B"];return["C","C"]}
 
 function afficherJoueurs(){
-
-    const poste = document.getElementById("poste").value;
-
-    const recherche =
-        document.getElementById("recherche")
-        .value
-        .toLowerCase()
-        .trim();
-
-    let liste = joueurs.filter(j => {
-
-        if(joueurEstAttribue(j))
-            return false;
-
-        const okPoste =
-            poste === "ALL" ||
-            j.poste === poste;
-
-        const okRecherche =
-            (j.nom || "").toLowerCase().includes(recherche) ||
-            (j.club || "").toLowerCase().includes(recherche);
-
-        return okPoste && okRecherche;
-    });
-
-    liste.sort((a,b) => {
-        const va = valeur(a);
-        const vb = valeur(b);
-
-        if(va == null && vb == null) return a.nom.localeCompare(b.nom);
-        if(va == null) return 1;
-        if(vb == null) return -1;
-
-        return (vb / prixAttendu(b)) - (va / prixAttendu(a));
-    });
-
-    const zone = document.getElementById("resultats");
-    zone.innerHTML = "";
-
-    if(liste.length === 0){
-
-        zone.innerHTML = `
-            <div class="card">
-                <h2>📋 Catalogue MPG à compléter</h2>
-                <p>
-                    Le catalogue Ligue 1 2026/27 est prêt au niveau des clubs,
-                    mais les joueurs individuels et leurs données MPG ne sont
-                    volontairement pas inventés avant la réouverture de ta ligue.
-                </p>
-                <p class="club">
-                    Dès que MPG est rouvert, nous pourrons importer les joueurs,
-                    postes, cotes et prix réels ici.
-                </p>
-            </div>
-        `;
-        return;
-    }
-
-    const budget = budgetDisponibleAnalyse();
-
-    liste.forEach(j => {
-
-        const v = valeur(j);
-        const p = prixAttendu(j);
-
-        if(v == null || p == null){
-
-            zone.innerHTML += `
-                <div class="player">
-
-                    <div class="player-top">
-                        <div>
-                            <div class="player-name">${j.nom}</div>
-                            <div class="club">
-                                ${j.club} • ${j.poste}
-                            </div>
-                        </div>
-
-                        <div class="badge B">À COMPLÉTER</div>
-                    </div>
-
-                    <div class="bid">
-                        📋 Données MPG manquantes.
-                        <br>
-                        Cote MPG : <b>—</b>
-                        • Prix : <b>—</b>
-                    </div>
-
-                </div>
-            `;
-            return;
-        }
-
-        const maxTheorique = enchereMax(j);
-        const maxBudget = Math.min(maxTheorique, budget);
-        const conseil = Math.min(Math.min(maxTheorique, p + 4), budget);
-        const pr = priorite(j);
-        const ratio = (v/p).toFixed(2);
-        const marge = v - p;
-
-        zone.innerHTML += `
-            <div class="player">
-
-                <div class="player-top">
-
-                    <div>
-                        <div class="player-name">${j.nom}</div>
-
-                        <div class="club">
-                            ${j.club}
-                            • ${j.poste}
-                            ${j.nouveau ? " • 🆕 2026/27" : ""}
-                        </div>
-                    </div>
-
-                    <div class="badge ${pr[1]}">
-                        ${pr[0]}
-                    </div>
-
-                </div>
-
-                <div class="stats">
-
-                    <div class="stat">
-                        <small>Score</small>
-                        <strong>${score(j).toFixed(1)}</strong>
-                    </div>
-
-                    <div class="stat">
-                        <small>Valeur</small>
-                        <strong>${v} M€</strong>
-                    </div>
-
-                    <div class="stat">
-                        <small>Prix attendu</small>
-                        <strong>${p} M€</strong>
-                    </div>
-
-                </div>
-
-                <div class="bid">
-
-                    🎯 <b>Enchère conseillée :</b>
-                    <span class="good">${conseil} M€</span>
-                    <br>
-
-                    🔴 <b>Plafond :</b>
-                    <span class="warning">${maxBudget} M€</span>
-                    <br>
-
-                    📊 Rapport valeur/prix :
-                    <b>${ratio}</b>
-                    <br>
-
-                    📈 Marge estimée :
-                    <span class="${marge >= 0 ? "good" : "danger"}">
-                        ${marge >= 0 ? "+" : ""}${marge} M€
-                    </span>
-
-                </div>
-
-            </div>
-        `;
-    });
+ const poste=document.getElementById("poste").value, recherche=document.getElementById("recherche").value.toLowerCase().trim();
+ let liste=joueurs.filter(j=>!joueurEstAttribue(j)&&(poste==="ALL"||j.poste===poste)&&((j.nom||"").toLowerCase().includes(recherche)||(j.club||"").toLowerCase().includes(recherche)));
+ liste.sort((a,b)=>{const va=valeur(a),vb=valeur(b);if(va==null&&vb==null)return(a.nom||"").localeCompare(b.nom||"");if(va==null)return 1;if(vb==null)return-1;return(vb/(prixAttendu(b)||1))-(va/(prixAttendu(a)||1))});
+ const zone=document.getElementById("resultats");zone.innerHTML="";
+ if(!liste.length){zone.innerHTML='<div class="card"><h2>📋 Catalogue MPG à compléter</h2><p>Aucun joueur disponible ne correspond à la recherche.</p><p class="club">Importe le catalogue réel MPG en CSV, TSV ou JSON.</p></div>';return}
+ const budget=Math.max(0,Number(document.getElementById("budget").value)||0);
+ liste.forEach(j=>{
+  const v=valeur(j),p=prixAttendu(j),cote=j.coteMPG??j.note,prix=j.prixMPG??j.prix;
+  if(v==null||p==null){zone.innerHTML+=`<div class="player"><div class="player-top"><div><div class="player-name">${esc(j.nom)}</div><div class="club">${esc(j.club)} • ${esc(j.poste)}</div></div><div class="badge B">À COMPLÉTER</div></div><div class="bid">📋 Données MPG incomplètes.<br>Cote MPG : <b>${cote??"—"}</b> • Prix : <b>${prix!=null?prix+" M€":"—"}</b></div></div>`;return}
+  const max=enchereMax(j),maxBudget=Math.min(max,budget),conseil=Math.min(Math.min(max,p+4),budget),pr=priorite(j),ratio=(v/p).toFixed(2),marge=v-p;
+  zone.innerHTML+=`<div class="player"><div class="player-top"><div><div class="player-name">${esc(j.nom)}</div><div class="club">${esc(j.club)} • ${esc(j.poste)}${j.nouveau?" • 🆕 2026/27":""}</div></div><div class="badge ${pr[1]}">${pr[0]}</div></div><div class="stats"><div class="stat"><small>Score</small><strong>${score(j).toFixed(1)}</strong></div><div class="stat"><small>Valeur</small><strong>${v} M€</strong></div><div class="stat"><small>Prix attendu</small><strong>${p} M€</strong></div></div><div class="bid">🎯 <b>Enchère conseillée :</b> <span class="good">${conseil} M€</span><br>🔴 <b>Plafond :</b> <span class="warning">${maxBudget} M€</span><br>📊 Rapport valeur/prix : <b>${ratio}</b><br>📈 Marge estimée : <span class="${marge>=0?"good":"danger"}">${marge>=0?"+":""}${marge} M€</span></div></div>`;
+ });
 }
 
-function analyser(){
+function analyser(){alert("Analyse lancée !\n\nBudget : "+Number(document.getElementById("budget").value)+" M€\nManagers : "+Number(document.getElementById("managers").value));afficherJoueurs()}
 
-    const budget =
-        Number(
-            document.getElementById("budget").value
-        );
-
-    const managers =
-        Number(
-            document.getElementById("managers").value
-        );
-
-    alert(
-        "Analyse lancée !\n\n" +
-        "Budget : " + budget + " M€\n" +
-        "Managers : " + managers
-    );
-
-    afficherJoueurs();
-
+/* IMPORT CORRIGÉ : les champs coteMPG/prixMPG sont conservés ET reliés aux anciens champs note/prix. */
+function normaliserJoueurBrut(obj){
+ const o={};Object.entries(obj||{}).forEach(([k,v])=>o[key(k)]=v);
+ const pm={g:"G",gardien:"G",gardiens:"G",goalkeeper:"G",d:"D",defenseur:"D",defenseurs:"D",defender:"D",m:"M",milieu:"M",milieux:"M",midfielder:"M",a:"A",attaquant:"A",attaquants:"A",forward:"A"};
+ const poste=pm[norm(o.poste??o.position??"")]||String(o.poste??o.position??"").toUpperCase();
+ const cote=num(o.cotempg??o.cote??o.note??o.notempg),prix=num(o.prixmpg??o.prix??o.enchere??o.prixminimum);
+ return {nom:String(o.nom??o.joueur??o.name??"").trim(),club:String(o.club??o.equipe??o.team??"").trim(),poste,coteMPG:cote,prixMPG:prix,note:num(o.note??cote),prix:prix,temps:num(o.temps??o.titularisation),buts:num(o.buts??o.but),passes:num(o.passes??o.passe),regularite:num(o.regularite??o.regularitempg),nouveau:bool(o.nouveau??o.new)};
 }
 
+function parseCSV(text,sep){
+ const rows=[];let row=[],cell="",q=false;
+ for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(q&&text[i+1]==='"'){cell+='"';i++}else q=!q;continue}
+  if(c===sep&&!q){row.push(cell);cell="";continue}
+  if((c==="\n"||c==="\r")&&!q){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cell);cell="";if(row.some(x=>String(x).trim()))rows.push(row);row=[];continue}
+  cell+=c;
+ }
+ if(cell!==""||row.length){row.push(cell);if(row.some(x=>String(x).trim()))rows.push(row)}
+ if(rows.length<2)return[];
+ const heads=rows[0].map(x=>String(x).replace(/^\uFEFF/,"").trim());
+ return rows.slice(1).map(r=>Object.fromEntries(heads.map((h,i)=>[h,r[i]??""])));
+}
+function detectSep(text){const l=text.replace(/^\uFEFF/,"").split(/\r?\n/).find(x=>x.trim())||"";const a=[[";",(l.match(/;/g)||[]).length],[",",(l.match(/,/g)||[]).length],["\t",(l.match(/\t/g)||[]).length]];return a.sort((x,y)=>y[1]-x[1])[0][0]}
+async function lireCatalogue(file){const text=await file.text(),name=file.name.toLowerCase();if(name.endsWith(".json")){const d=JSON.parse(text);if(Array.isArray(d))return d;if(Array.isArray(d.joueurs))return d.joueurs;if(Array.isArray(d.players))return d.players;throw Error("Le JSON doit contenir un tableau de joueurs.")}return parseCSV(text,name.endsWith(".tsv")?"\t":detectSep(text))}
+function indexCatalogue(){const m=new Map();joueurs.forEach(j=>m.set(norm(j.nom),j));return m}
+function fusionner(a,b){Object.keys(b).forEach(k=>{if(k!=="nom"&&b[k]!==null&&b[k]!==undefined&&b[k]!=="")a[k]=b[k]});if(a.note==null)a.note=a.coteMPG;if(a.prix==null)a.prix=a.prixMPG;return a}
+
+async function importerCatalogue(){
+ const input=document.getElementById("catalogueFile"),status=document.getElementById("importStatus"),mode=document.getElementById("importMode").value;
+ status.style.display="block";status.className="status";
+ if(!input.files?.[0]){status.classList.add("error");status.textContent="❌ Sélectionne un fichier CSV, TSV ou JSON.";return}
+ try{
+  const brut=await lireCatalogue(input.files[0]), entrants=brut.map(normaliserJoueurBrut).filter(j=>j.nom);
+  if(!entrants.length)throw Error("Aucun joueur avec un nom n'a été trouvé.");
+  if(mode==="replace") joueurs=entrants;
+  else{const map=indexCatalogue();let aj=0,maj=0;entrants.forEach(e=>{const old=map.get(norm(e.nom));if(old){fusionner(old,e);maj++}else{joueurs.push(e);map.set(norm(e.nom),e);aj++}});status.classList.add("ok");status.textContent=`✅ Import terminé : ${aj} ajout(s), ${maj} mise(s) à jour. Catalogue total : ${joueurs.length}. Les effectifs sont inchangés.`;mettreAJourEtatLigue();afficherJoueurs();input.value="";return}
+  status.classList.add("ok");status.textContent=`✅ Catalogue remplacé : ${joueurs.length} joueur(s). Les 10 managers et leurs effectifs sont inchangés.`;
+  mettreAJourEtatLigue();afficherJoueurs();input.value="";
+ }catch(e){console.error(e);status.classList.add("error");status.textContent="❌ Import impossible : "+e.message}
+}
+
+function telechargerTexte(txt,name,type){const a=document.createElement("a"),u=URL.createObjectURL(new Blob([txt],{type}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+function telechargerModeleCSV(){telechargerTexte("﻿nom;club;poste;coteMPG;prixMPG;note;temps;buts;passes;regularite;nouveau\nJoueur Test A;PSG;A;7,5;35;7,5;90;12;8;85;false\nJoueur Test B;Lille;M;7,0;22;7,0;82;6;10;80;true\n","modele-catalogue-mpg.csv","text/csv;charset=utf-8")}
+function exporterCatalogue(){if(!joueurs.length){afficherStatus("warn","⚠️ Le catalogue est vide.");return}const h=["nom","club","poste","coteMPG","prixMPG","note","temps","buts","passes","regularite","nouveau"],rows=[h.join(";")];joueurs.forEach(j=>rows.push(h.map(k=>{let v=j[k]??"";if(typeof v==="string"&&/[;"\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"';return v}).join(";")));telechargerTexte("﻿"+rows.join("\n"),"catalogue-mpg-export.csv","text/csv;charset=utf-8")}
+function afficherStatus(type,msg){const s=document.getElementById("importStatus");s.style.display="block";s.className="status "+type;s.textContent=msg}
+function effacerCatalogue(){if(!confirm("Effacer tout le catalogue importé ?\n\nLes 10 managers, leurs budgets et leurs effectifs resteront inchangés."))return;joueurs=[];afficherStatus("ok","🗑️ Catalogue effacé. Les données de ligue sont intactes.");mettreAJourEtatLigue();afficherJoueurs()}
 
 function mettreAJourEtatLigue(){
-
-    const managers =
-        ligue.managersData.length;
-
-    const joueursAttribues =
-        ligue.managersData.reduce(
-            (total, manager) =>
-                total + manager.joueurs.length,
-            0
-        );
-
-    const joueursDisponibles =
-        joueurs.filter(j => {
-
-            return !ligue.managersData.some(
-                manager =>
-                    manager.joueurs.includes(j.nom)
-            );
-
-        }).length;
-
-    document.getElementById("ligueManagers")
-        .textContent = managers;
-
-    document.getElementById("ligueBudget")
-        .textContent = ligue.budgetInitial + " M€";
-
-    document.getElementById("joueursAttribues")
-        .textContent = joueursAttribues;
-
-    document.getElementById("joueursDisponibles")
-        .textContent = joueursDisponibles;
+ const n=ligue.managersData.length,a=ligue.managersData.reduce((t,m)=>t+m.joueurs.length,0),d=joueurs.filter(j=>!joueurEstAttribue(j)).length;
+ document.getElementById("ligueManagers").textContent=n;document.getElementById("ligueBudget").textContent=ligue.budgetInitial+" M€";document.getElementById("joueursAttribues").textContent=a;document.getElementById("joueursDisponibles").textContent=d;
 }
-
-mettreAJourEtatLigue();
-afficherJoueurs();
-
+mettreAJourEtatLigue();afficherJoueurs();
 </script>
-
 </body>
 </html>
