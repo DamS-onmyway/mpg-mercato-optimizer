@@ -212,59 +212,6 @@ button{
     padding:20px 0;
 }
 
-textarea{
-    width:100%;
-    min-height:150px;
-    resize:vertical;
-    padding:12px;
-    border-radius:10px;
-    border:1px solid #35415f;
-    background:#0e1527;
-    color:white;
-    font:13px/1.45 Consolas,Monaco,monospace;
-}
-
-.import-actions{
-    display:grid;
-    grid-template-columns:repeat(5,1fr);
-    gap:8px;
-    margin-top:12px;
-}
-
-.secondary{
-    background:#26324f;
-    color:white;
-    border:1px solid #3a486a;
-}
-
-.primary-inline{
-    background:var(--green);
-    color:#07130c;
-}
-
-.import-status{
-    margin-top:12px;
-    padding:10px 12px;
-    border-radius:10px;
-    background:#11182b;
-    color:var(--muted);
-    font-size:13px;
-}
-
-.import-status.ok{
-    color:var(--green);
-}
-
-.import-status.error{
-    color:var(--red);
-}
-
-@media(max-width:700px){
-    .import-actions{
-        grid-template-columns:1fr 1fr;
-    }
-}
-
 @media(max-width:600px){
     .grid,
     .filters{
@@ -338,6 +285,22 @@ textarea{
 </div>
 
 <div class="card">
+    <h2>📥 Import du catalogue MPG</h2>
+    <p style="color:var(--muted);font-size:12px;line-height:1.5;">
+        Import CSV/TSV du catalogue MPG. Les imports mettent à jour uniquement les joueurs :
+        <b>les 10 managers et leurs effectifs restent inchangés</b>.
+        Champs disponibilité : blessure, durée d'absence, retour estimé, gravité, suspension.
+    </p>
+    <input id="fichierImport" type="file" accept=".csv,.tsv,.txt,.json">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button type="button" onclick="importerCatalogue()" style="background:var(--green);color:#07130c;">📥 Importer</button>
+        <button type="button" onclick="telechargerModele()" style="background:#26375e;color:white;">📄 Modèle CSV</button>
+        <button type="button" onclick="exporterCatalogue()" style="background:#26375e;color:white;">📤 Exporter</button>
+    </div>
+    <div id="importResult" style="margin-top:10px;"></div>
+</div>
+
+<div class="card">
     <h2>🎯 Recherche</h2>
 
     <div class="filters">
@@ -366,51 +329,7 @@ textarea{
     </div>
 </div>
 
-<div class="card" id="importCard">
-    <h2>📥 Importer le catalogue MPG</h2>
-    <p class="club">
-        Tu pourras importer le catalogue réel dès que MPG sera ouvert, sans toucher au reste de l'application.
-        Formats acceptés : <b>CSV</b>, <b>TSV</b> ou <b>JSON</b>.
-    </p>
-
-    <div class="grid">
-        <div>
-            <label>Fichier catalogue</label>
-            <input id="catalogueFile" type="file" accept=".csv,.tsv,.txt,.json,text/csv,application/json">
-        </div>
-        <div>
-            <label>Mode d'import</label>
-            <select id="importMode">
-                <option value="replace">Remplacer le catalogue</option>
-                <option value="merge">Ajouter / mettre à jour</option>
-            </select>
-        </div>
-    </div>
-
-    <label style="margin-top:12px">Ou colle directement les données ici</label>
-    <textarea id="catalogueText" rows="8" placeholder="CSV / TSV / JSON...
-Exemple CSV :
-nom;club;poste;cote;prix;note;temps;buts;passes;regularite;nouveau;blesse;dateMajBlessure;dureeAbsenceEstimee;retourEstime;gravite;statutDispo;impactMercato;suspendu;statutTitulaire
-Joueur Exemple;PSG;A;20;24;7,2;90;10;5;85;false;true;17/08/2026;2-3 semaines;05/09/2026;moyenne;OUT;MOYEN;false;TITULAIRE"></textarea>
-
-    <div class="import-actions">
-        <button class="secondary" onclick="chargerFichierCatalogue()">📂 Lire le fichier</button>
-        <button class="primary-inline" onclick="importerCatalogue()">✅ Importer le catalogue</button>
-        <button class="secondary" onclick="telechargerModeleCSV()">⬇️ Modèle CSV</button>
-        <button class="secondary" onclick="exporterCatalogue()">💾 Exporter</button>
-        <button class="secondary" onclick="effacerCatalogue()">🗑️ Effacer</button>
-    </div>
-
-    <div id="importStatus" class="import-status">Aucun catalogue importé. Le catalogue actuel contient 0 joueur. Les champs blessure/disponibilité sont disponibles.</div>
-</div>
-
 <div id="resultats"></div>
-
-<div class="card">
-    <h2>🚑 Disponibilité</h2>
-    <p>La blessure ou la suspension ne change pas la valeur intrinsèque du joueur : elle réduit uniquement le montant conseillé à immobiliser.</p>
-    <p class="club">Les champs de disponibilité sont datés et doivent être réactualisés avant l'ouverture de ta ligue.</p>
-</div>
 
 <div class="card">
     <h2>💡 Comment fonctionne l'outil ?</h2>
@@ -435,9 +354,7 @@ Joueur Exemple;PSG;A;20;24;7,2;90;10;5;85;false;true;17/08/2026;2-3 semaines;05/
 </div>
 
 <div class="footer">
-    MPG Mercato Optimizer — V1 catalogue 2026/27
-    <br>
-    Catalogue clubs public • Données MPG à synchroniser à la réouverture de la ligue
+    MPG Mercato Optimizer — Version 1
 </div>
 
 </div>
@@ -542,348 +459,124 @@ const ligue = {
 ]
 };
 
-const joueurs = [];
+let joueurs = [
 
-// Catalogue clubs 2026/27 — base publique.
-// Les joueurs individuels et les données MPG sont importables sans modifier le reste de l'application.
-const catalogueClubs = [('Angers SCO', 'ANG'), ('AJ Auxerre', 'AJA'), ('Stade Brestois 29', 'BRE'), ('Le Havre AC', 'HAC'), ('Le Mans FC', 'LM'), ('RC Lens', 'LEN'), ('LOSC Lille', 'LIL'), ('FC Lorient', 'LOR'), ('Olympique Lyonnais', 'OL'), ('Olympique de Marseille', 'OM'), ('AS Monaco', 'MON'), ('OGC Nice', 'NIC'), ('Paris FC', 'PFC'), ('Paris Saint-Germain', 'PSG'), ('Stade Rennais FC', 'REN'), ('RC Strasbourg Alsace', 'RCS'), ('Toulouse FC', 'TFC'), ('ESTAC Troyes', 'TRO')];
+{
+nom:"Joueur Premium A",
+club:"PSG",
+poste:"A",
+note:7.5,
+temps:95,
+buts:90,
+passes:80,
+regularite:90,
+prix:55,
+nouveau:false
+},
 
-// -------------------------
-// Import / synchronisation du catalogue
-// -------------------------
-const CATALOGUE_STORAGE_KEY = "mpg_catalogue_2026_27_v2";
+{
+nom:"Joueur Premium B",
+club:"Monaco",
+poste:"M",
+note:7.2,
+temps:90,
+buts:70,
+passes:85,
+regularite:86,
+prix:38,
+nouveau:true
+},
 
-function normaliserTexte(v){
-    return String(v ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toLowerCase();
+{
+nom:"Pépite C",
+club:"Lille",
+poste:"M",
+note:7.0,
+temps:82,
+buts:62,
+passes:76,
+regularite:80,
+prix:21,
+nouveau:true
+},
+
+{
+nom:"Défenseur D",
+club:"Rennes",
+poste:"D",
+note:6.9,
+temps:91,
+buts:30,
+passes:35,
+regularite:83,
+prix:18,
+nouveau:true
+},
+
+{
+nom:"Défenseur E",
+club:"Strasbourg",
+poste:"D",
+note:6.8,
+temps:88,
+buts:25,
+passes:40,
+regularite:78,
+prix:14,
+nouveau:false
+},
+
+{
+nom:"Gardien F",
+club:"Lyon",
+poste:"G",
+note:6.9,
+temps:95,
+buts:0,
+passes:5,
+regularite:84,
+prix:16,
+nouveau:true
+},
+
+{
+nom:"Attaquant G",
+club:"Rennes",
+poste:"A",
+note:6.9,
+temps:84,
+buts:74,
+passes:51,
+regularite:76,
+prix:27,
+nouveau:true
+},
+
+{
+nom:"Milieu H",
+club:"Paris FC",
+poste:"M",
+note:6.8,
+temps:80,
+buts:48,
+passes:70,
+regularite:75,
+prix:12,
+nouveau:true
+
 }
 
-function normaliserNombre(v){
-    if(v === null || v === undefined || v === "") return null;
-    const n = Number(
-        String(v)
-            .replace(/€/g, "")
-            .replace(/%/g, "")
-            .replace(/\s/g, "")
-            .replace(/,/g, ".")
-            .replace(/[^0-9.+-]/g, "")
-    );
-    return Number.isFinite(n) ? n : null;
-}
+];
 
-function normaliserBooleen(v){
-    const t = normaliserTexte(v);
-    return ["true","1","oui","yes","vrai","x"].includes(t);
-}
-
-function normaliserPoste(v){
-    const t = normaliserTexte(v);
-    if(["g","gardien","gardiens","goal","goalkeeper"].includes(t)) return "G";
-    if(["d","def","defenseur","defenseurs","defender"].includes(t)) return "D";
-    if(["m","milieu","milieux","midfielder"].includes(t)) return "M";
-    if(["a","att","attaquant","attaquants","forward"].includes(t)) return "A";
-    return String(v ?? "").trim().toUpperCase();
-}
-
-function normaliserClub(v){
-    const brut = String(v ?? "").trim();
-    const t = normaliserTexte(brut);
-    const aliases = {
-        "psg":"Paris Saint-Germain", "paris sg":"Paris Saint-Germain", "paris saint germain":"Paris Saint-Germain",
-        "monaco":"AS Monaco", "asm":"AS Monaco",
-        "lille":"LOSC Lille", "losc":"LOSC Lille",
-        "lyon":"Olympique Lyonnais", "ol":"Olympique Lyonnais",
-        "marseille":"Olympique de Marseille", "om":"Olympique de Marseille",
-        "rennes":"Stade Rennais FC", "srfc":"Stade Rennais FC",
-        "strasbourg":"RC Strasbourg Alsace", "rc strasbourg":"RC Strasbourg Alsace",
-        "lens":"RC Lens", "rc lens":"RC Lens",
-        "paris fc":"Paris FC", "pfc":"Paris FC",
-        "auxerre":"AJ Auxerre", "aja":"AJ Auxerre",
-        "brest":"Stade Brestois 29", "stade brestois":"Stade Brestois 29",
-        "le havre":"Le Havre AC", "hac":"Le Havre AC",
-        "le mans":"Le Mans FC", "lm":"Le Mans FC",
-        "lorient":"FC Lorient", "fcl":"FC Lorient",
-        "nice":"OGC Nice", "ogc nice":"OGC Nice",
-        "toulouse":"Toulouse FC", "tfc":"Toulouse FC",
-        "angers":"Angers SCO", "angers sco":"Angers SCO",
-        "troyes":"ESTAC Troyes", "estac":"ESTAC Troyes"
-    };
-    return aliases[t] || brut;
-}
-
-function normaliserJoueur(raw){
-    const j = {
-        nom: String(raw.nom ?? raw.name ?? raw.joueur ?? raw.player ?? "").trim(),
-        club: normaliserClub(raw.club ?? raw.equipe ?? raw.team),
-        poste: normaliserPoste(raw.poste ?? raw.position ?? raw.pos),
-        cote: normaliserNombre(raw.cote ?? raw.coteMpg ?? raw.value ?? raw.rating),
-        prix: normaliserNombre(raw.prix ?? raw.prixMpg ?? raw.price ?? raw.enchere),
-        note: normaliserNombre(raw.note ?? raw.noteMpg),
-        temps: normaliserNombre(raw.temps ?? raw.titularisation ?? raw.presence),
-        buts: normaliserNombre(raw.buts ?? raw.goals),
-        passes: normaliserNombre(raw.passes ?? raw.assists),
-        regularite: normaliserNombre(raw.regularite ?? raw.regularity),
-        nouveau: normaliserBooleen(raw.nouveau ?? raw.new ?? false),
-        blesse: normaliserBooleen(raw.blesse ?? raw.blesseActuellement ?? raw.injured ?? false),
-        dateMajBlessure: String(raw.dateMajBlessure ?? raw.dateBlessure ?? raw.injuryUpdate ?? "").trim(),
-        dureeAbsenceEstimee: String(raw.dureeAbsenceEstimee ?? raw.dureeAbsence ?? raw.absence ?? "").trim(),
-        retourEstime: String(raw.retourEstime ?? raw.dateRetour ?? raw.returnDate ?? "").trim(),
-        gravite: String(raw.gravite ?? raw.graviteBlessure ?? "").trim(),
-        statutDispo: String(raw.statutDispo ?? raw.disponibilite ?? raw.status ?? "DISPONIBLE").trim().toUpperCase(),
-        impactMercato: String(raw.impactMercato ?? raw.impact ?? "FAIBLE").trim().toUpperCase(),
-        suspendu: normaliserBooleen(raw.suspendu ?? raw.suspension ?? false),
-        statutTitulaire: String(raw.statutTitulaire ?? raw.titularite ?? "INCONNU").trim().toUpperCase()
-    };
-
-    return j;
-}
-
-function joueurValide(j){
-    return !!j.nom && !!j.club && ["G","D","M","A"].includes(j.poste);
-}
-
-function cleJoueur(j){
-    return normaliserTexte(j.nom) + "|" + normaliserTexte(j.club);
-}
-
-function sauvegarderCatalogue(){
-    localStorage.setItem(CATALOGUE_STORAGE_KEY, JSON.stringify(joueurs));
-}
-
-function chargerCatalogueLocal(){
-    try{
-        const brut = localStorage.getItem(CATALOGUE_STORAGE_KEY);
-        if(!brut) return;
-        const data = JSON.parse(brut);
-        if(!Array.isArray(data)) return;
-        data.map(normaliserJoueur).filter(joueurValide).forEach(j => joueurs.push(j));
-    }catch(e){
-        console.warn("Catalogue local impossible à charger", e);
-    }
-}
-
-function joueurCatalogue(nom){
-    return joueurs.find(j => normaliserTexte(j.nom) === normaliserTexte(nom));
-}
-
-function joueurEstAttribue(j){
-    const cle = normaliserTexte(j.nom);
-    return ligue.managersData.some(manager =>
-        manager.joueurs.some(nom => normaliserTexte(nom) === cle)
-    );
-}
-
-function detecterDelimiteur(text){
-    const ligne = text.split(/\r?\n/).find(l => l.trim());
-    if(!ligne) return ";";
-    const compte = ch => ligne.split(ch).length - 1;
-    const scores = [["\t", compte("\t")],[";",compte(";")],[",",compte(",")]];
-    scores.sort((a,b) => b[1]-a[1]);
-    return scores[0][1] ? scores[0][0] : ";";
-}
-
-function parserLigneCSV(ligne, delim){
-    const cellules = [];
-    let courant = "";
-    let guillemet = false;
-    for(let i=0;i<ligne.length;i++){
-        const c = ligne[i];
-        if(c === '"'){
-            if(guillemet && ligne[i+1] === '"'){
-                courant += '"'; i++;
-            }else{
-                guillemet = !guillemet;
-            }
-        }else if(c === delim && !guillemet){
-            cellules.push(courant.trim());
-            courant = "";
-        }else{
-            courant += c;
-        }
-    }
-    cellules.push(courant.trim());
-    return cellules;
-}
-
-function parserCatalogueCSV(text){
-    const delim = detecterDelimiteur(text);
-    const lignes = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if(lignes.length < 2) throw new Error("Le CSV doit contenir une ligne d'en-têtes et au moins un joueur.");
-
-    const entetes = parserLigneCSV(lignes[0], delim).map(normaliserTexte);
-    const alias = {
-        nom:["nom","name","joueur","player"],
-        club:["club","equipe","équipe","team"],
-        poste:["poste","position","pos"],
-        cote:["cote","cote mpg","cote mpg m€","value","rating"],
-        prix:["prix","prix mpg","price","enchere","enchère"],
-        note:["note","note mpg"],
-        temps:["temps","titularisation","presence","présence"],
-        buts:["buts","goals"],
-        passes:["passes","assists"],
-        regularite:["regularite","régularité","regularity"],
-        nouveau:["nouveau","new"],
-        blesse:["blesse","blessé","blesse actuellement","injured"],
-        dateMajBlessure:["dateMajBlessure","date maj blessure","date blessure","injury update"],
-        dureeAbsenceEstimee:["dureeAbsenceEstimee","durée absence estimée","duree absence","absence","injury duration"],
-        retourEstime:["retourEstime","retour estimé","date retour","return date"],
-        gravite:["gravite","gravité","gravite blessure","injury severity"],
-        statutDispo:["statutDispo","statut dispo","disponibilite","disponibilité","status"],
-        impactMercato:["impactMercato","impact mercato","impact"],
-        suspendu:["suspendu","suspension","suspended"],
-        statutTitulaire:["statutTitulaire","statut titulaire","titularite","titularité","starter status"]
-    };
-
-    const index = {};
-    Object.entries(alias).forEach(([champ,noms]) => {
-        const i = entetes.findIndex(h => noms.map(normaliserTexte).includes(h));
-        if(i >= 0) index[champ] = i;
-    });
-
-    if(index.nom === undefined || index.club === undefined || index.poste === undefined){
-        throw new Error("Colonnes obligatoires manquantes : nom, club et poste.");
-    }
-
-    return lignes.slice(1).map(ligne => {
-        const c = parserLigneCSV(ligne, delim);
-        const raw = {};
-        Object.entries(index).forEach(([champ,i]) => raw[champ] = c[i] ?? "");
-        return normaliserJoueur(raw);
-    });
-}
-
-function parserCatalogue(text){
-    const propre = text.replace(/^\uFEFF/, "").trim();
-    if(!propre) throw new Error("Aucune donnée à importer.");
-
-    if(propre[0] === "[" || propre[0] === "{"){
-        let data;
-        try{ data = JSON.parse(propre); }
-        catch(e){ throw new Error("JSON invalide."); }
-        if(!Array.isArray(data)) data = data.joueurs || data.players || data.data || [];
-        if(!Array.isArray(data) || !data.length) throw new Error("Le JSON ne contient aucun joueur.");
-        return data.map(normaliserJoueur);
-    }
-    return parserCatalogueCSV(propre);
-}
-
-function mettreAJourImportStatus(message, type=""){
-    const el = document.getElementById("importStatus");
-    el.className = "import-status" + (type ? " " + type : "");
-    el.textContent = message;
-}
-
-function appliquerCatalogue(data, mode){
-    const valides = data.filter(joueurValide);
-    const invalides = data.length - valides.length;
-    if(!valides.length) throw new Error("Aucun joueur valide trouvé. Vérifie nom, club et poste.");
-
-    if(mode === "replace"){
-        joueurs.splice(0, joueurs.length, ...valides);
-    }else{
-        const index = new Map(joueurs.map((j,i) => [cleJoueur(j), i]));
-        valides.forEach(j => {
-            const k = cleJoueur(j);
-            if(index.has(k)) joueurs[index.get(k)] = j;
-            else { index.set(k, joueurs.length); joueurs.push(j); }
-        });
-    }
-
-    sauvegarderCatalogue();
-    mettreAJourEtatLigue();
-    afficherJoueurs();
-    mettreAJourImportStatus(
-        `${valides.length} joueur(s) importé(s)${invalides ? ` • ${invalides} ligne(s) ignorée(s)` : ""}. Catalogue total : ${joueurs.length}.`,
-        "ok"
-    );
-}
-
-function importerCatalogue(){
-    const text = document.getElementById("catalogueText").value;
-    const mode = document.getElementById("importMode").value;
-    try{
-        appliquerCatalogue(parserCatalogue(text), mode);
-    }catch(e){
-        mettreAJourImportStatus("Erreur : " + e.message, "error");
-    }
-}
-
-function chargerFichierCatalogue(){
-    const input = document.getElementById("catalogueFile");
-    const file = input.files && input.files[0];
-    if(!file){
-        mettreAJourImportStatus("Choisis d'abord un fichier CSV, TSV ou JSON.", "error");
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-        document.getElementById("catalogueText").value = reader.result;
-        mettreAJourImportStatus(`Fichier « ${file.name} » chargé. Clique sur « Importer le catalogue ».`);
-    };
-    reader.onerror = () => mettreAJourImportStatus("Impossible de lire le fichier.", "error");
-    reader.readAsText(file, "UTF-8");
-}
-
-function telechargerModeleCSV(){
-    const contenu = [
-        "nom;club;poste;cote;prix;note;temps;buts;passes;regularite;nouveau;blesse;dateMajBlessure;dureeAbsenceEstimee;retourEstime;gravite;statutDispo;impactMercato;suspendu;statutTitulaire",
-        "Joueur Exemple;Paris Saint-Germain;A;20;24;7,2;90;10;5;85;false;true;17/08/2026;2-3 semaines;05/09/2026;moyenne;OUT;MOYEN;false;TITULAIRE"
-    ].join("\\n");
-    telechargerTexte(contenu, "modele_catalogue_mpg_2026_27.csv", "text/csv;charset=utf-8");
-}
-
-function effacerCatalogue(){
-    if(!joueurs.length){
-        mettreAJourImportStatus("Le catalogue est déjà vide.");
-        return;
-    }
-    if(!confirm("Effacer le catalogue importé de cet appareil ? Les effectifs des managers ne seront pas supprimés.")) return;
-    joueurs.splice(0, joueurs.length);
-    localStorage.removeItem(CATALOGUE_STORAGE_KEY);
-    mettreAJourEtatLigue();
-    afficherJoueurs();
-    mettreAJourImportStatus("Catalogue local effacé. Les effectifs des managers sont conservés.");
-}
-
-function exporterCatalogue(){
-    if(!joueurs.length){
-        mettreAJourImportStatus("Le catalogue est vide : rien à exporter.", "error");
-        return;
-    }
-    const contenu = JSON.stringify(joueurs, null, 2);
-    telechargerTexte(contenu, "catalogue_mpg_2026_27.json", "application/json;charset=utf-8");
-}
-
-function telechargerTexte(contenu, nom, type){
-    const blob = new Blob([contenu], {type});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nom;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-}
-
-chargerCatalogueLocal();
 
 function score(j){
-
-    // Tant que les données MPG réelles ne sont pas disponibles,
-    // on n'invente aucune note.
     if(
         j.note == null ||
         j.temps == null ||
         j.buts == null ||
         j.passes == null ||
         j.regularite == null
-    ){
-        return null;
-    }
+    ) return null;
 
     return (
         j.note * 8 +
@@ -894,49 +587,50 @@ function score(j){
     );
 }
 
-
 function valeur(j){
-
     const s = score(j);
-
-    if(s == null)
-        return null;
-
-    return Math.round(s * 0.42);
-}
-
-
-function facteurDisponibilite(j){
-    let facteur = 1;
-
-    if(j.blesse || j.statutDispo === "OUT") {
-        const gravite = normaliserTexte(j.gravite);
-        if(gravite.includes("long")) facteur = 0.55;
-        else if(gravite.includes("moy")) facteur = 0.72;
-        else facteur = 0.85;
-
-        const duree = normaliserTexte(j.dureeAbsenceEstimee);
-        if(/(?:4|5|6|7|8|9|[1-9][0-9])\s*sem/.test(duree)) facteur = Math.min(facteur, 0.60);
-        else if(/(?:2|3)\s*sem/.test(duree)) facteur = Math.min(facteur, 0.75);
-        else if(/1\s*sem/.test(duree)) facteur = Math.min(facteur, 0.88);
-    }
-
-    if(j.suspendu) facteur = Math.min(facteur, 0.85);
-    if(j.statutDispo === "INCERTAIN") facteur = Math.min(facteur, 0.85);
-    return facteur;
+    return s == null ? null : Math.round(s * 0.42);
 }
 
 function prixAttendu(j){
     const v = valeur(j);
-    if(v == null && j.prix == null) return null;
-    if(v == null) return j.prix;
+    if(v == null || j.prix == null) return null;
 
     let inflation = 1.05;
     if(j.poste === "A") inflation = 1.18;
     if(j.poste === "M") inflation = 1.12;
     if(j.nouveau) inflation += 0.05;
 
-    return Math.round(Math.max(j.prix ?? 0, v * inflation * 0.65));
+    return Math.round(Math.max(j.prix, v * inflation * 0.65));
+}
+
+function facteurDisponibilite(j){
+    let f = 1;
+
+    if(j.suspendu) f = Math.min(f, 0.85);
+    if(j.statutDispo === "INCERTAIN") f = Math.min(f, 0.85);
+
+    if(j.blesse || j.statutDispo === "OUT"){
+        const gravite = String(j.gravite || "").toLowerCase();
+        if(gravite.includes("long")) f = Math.min(f, 0.55);
+        else if(gravite.includes("moy")) f = Math.min(f, 0.72);
+        else f = Math.min(f, 0.85);
+
+        const duree = String(j.dureeAbsenceEstimee || "").toLowerCase();
+        if(/([4-9]|[1-9][0-9])\s*sem/.test(duree)) f = Math.min(f, 0.60);
+        else if(/([2-3])\s*sem/.test(duree)) f = Math.min(f, 0.75);
+        else if(/1\s*sem/.test(duree)) f = Math.min(f, 0.88);
+    }
+
+    return f;
+}
+
+function texteDisponibilite(j){
+    if(j.suspendu) return "⛔ Suspendu";
+    if(j.blesse || j.statutDispo === "OUT")
+        return "🚑 Blessé • " + (j.dureeAbsenceEstimee || "durée inconnue") + (j.retourEstime ? " • retour ~ " + j.retourEstime : "");
+    if(j.statutDispo === "INCERTAIN") return "❓ Disponibilité incertaine";
+    return "🟢 Disponible";
 }
 
 function enchereMax(j){
@@ -948,37 +642,22 @@ function enchereMax(j){
     if(v > p * 1.3) max = p * 1.25;
     if(v < p) max = p * 0.9;
 
-    // Disponibilité : on ne dévalue pas la qualité du joueur,
-    // mais on réduit le montant que nous sommes prêts à immobiliser.
     return Math.max(0, Math.round(max * facteurDisponibilite(j)));
 }
 
 function priorite(j){
-
     const v = valeur(j);
     const p = prixAttendu(j);
-
-    if(v == null || p == null)
-        return ["—","B"];
+    if(v == null || p == null) return ["—","B"];
 
     const ratio = v / p;
     if(facteurDisponibilite(j) < 0.65) return ["C","C"];
-
-    if(ratio >= 1.45)
-        return ["S","S"];
-
-    if(ratio >= 1.25)
-        return ["A+","Aplus"];
-
-    if(ratio >= 1.05)
-        return ["A","A"];
-
-    if(ratio >= .90)
-        return ["B","B"];
-
+    if(ratio >= 1.45) return ["S","S"];
+    if(ratio >= 1.25) return ["A+","Aplus"];
+    if(ratio >= 1.05) return ["A","A"];
+    if(ratio >= .90) return ["B","B"];
     return ["C","C"];
 }
-
 
 function afficherJoueurs(){
 
@@ -987,173 +666,120 @@ function afficherJoueurs(){
     const recherche =
         document.getElementById("recherche")
         .value
-        .toLowerCase()
-        .trim();
+        .toLowerCase();
 
     let liste = joueurs.filter(j => {
-
-        if(joueurEstAttribue(j))
-            return false;
 
         const okPoste =
             poste === "ALL" ||
             j.poste === poste;
 
         const okRecherche =
-            (j.nom || "").toLowerCase().includes(recherche) ||
-            (j.club || "").toLowerCase().includes(recherche);
+            j.nom.toLowerCase().includes(recherche) ||
+            j.club.toLowerCase().includes(recherche) ||
+            texteDisponibilite(j).toLowerCase().includes(recherche);
 
         return okPoste && okRecherche;
+
     });
 
     liste.sort((a,b) => {
         const va = valeur(a);
         const vb = valeur(b);
-
         if(va == null && vb == null) return a.nom.localeCompare(b.nom);
         if(va == null) return 1;
         if(vb == null) return -1;
-
         return (vb / prixAttendu(b)) - (va / prixAttendu(a));
     });
 
-    const zone = document.getElementById("resultats");
+    const zone =
+        document.getElementById("resultats");
+
     zone.innerHTML = "";
-
-    if(liste.length === 0){
-
-        zone.innerHTML = `
-            <div class="card">
-                <h2>📋 Catalogue à importer</h2>
-                <p>
-                    Aucun joueur disponible dans le catalogue pour le moment.
-                    Utilise le bloc <b>Importer le catalogue MPG</b> ci-dessus
-                    pour charger les données réelles en CSV, TSV ou JSON.
-                </p>
-            </div>
-        `;
-        return;
-    }
-
-    const budget = budgetDisponibleAnalyse();
 
     liste.forEach(j => {
 
         const v = valeur(j);
         const p = prixAttendu(j);
+        const max = enchereMax(j);
 
-        if(v == null || p == null){
-
-            zone.innerHTML += `
-                <div class="player">
-
-                    <div class="player-top">
-                        <div>
-                            <div class="player-name">${j.nom}</div>
-                            <div class="club">
-                                ${j.club} • ${j.poste}
-                            </div>
-                        </div>
-
-                        <div class="badge B">À COMPLÉTER</div>
-                    </div>
-
-                    <div class="bid">
-                        📋 Données MPG manquantes.
-                        <br>
-                        Cote MPG : <b>—</b>
-                        • Prix : <b>—</b>
-                    </div>
-
-                </div>
-            `;
-            return;
-        }
-
-        const maxTheorique = enchereMax(j);
-        const maxBudget = Math.min(maxTheorique, budget);
-        const conseil = Math.min(Math.min(maxTheorique, p + 4), budget);
         const pr = priorite(j);
-        const ratio = (v/p).toFixed(2);
-        const marge = v - p;
 
-        const indisponible = j.blesse || j.suspendu || j.statutDispo === "OUT" || j.statutDispo === "INCERTAIN";
-        const infoDispo = indisponible ? `
-                    <div class="bid ${facteurDisponibilite(j) < 0.65 ? "danger" : "warning"}">
-                        ${j.suspendu ? "⛔ Suspendu" : (j.blesse || j.statutDispo === "OUT") ? "🚑 Blessé" : "❓ Disponibilité incertaine"}
-                        ${j.dureeAbsenceEstimee ? ` • Absence : <b>${j.dureeAbsenceEstimee}</b>` : ""}
-                        ${j.retourEstime ? ` • Retour estimé : <b>${j.retourEstime}</b>` : ""}
-                        ${j.dateMajBlessure ? ` • MAJ : ${j.dateMajBlessure}` : ""}
-                    </div>` : "";
+        const ratio =
+            (v/p).toFixed(2);
 
         zone.innerHTML += `
-            <div class="player">
 
-                <div class="player-top">
+        <div class="player">
 
-                    <div>
-                        <div class="player-name">${j.nom}</div>
+            <div class="player-top">
 
-                        <div class="club">
-                            ${j.club}
-                            • ${j.poste}
-                            ${j.nouveau ? " • 🆕 2026/27" : ""}
-                        </div>
+                <div>
+                    <div class="player-name">
+                        ${j.nom}
                     </div>
 
-                    <div class="badge ${pr[1]}">
-                        ${pr[0]}
+                    <div class="club">
+                        ${j.club}
+                        • ${j.poste}
+                        ${j.nouveau ? " • 🆕 2026/27" : ""}
                     </div>
-
+                    ${((j.blesse || j.suspendu || j.statutDispo === "INCERTAIN") ? `<div style="margin-top:7px;color:${facteurDisponibilite(j) < 0.7 ? "var(--red)" : "var(--orange)"};font-size:12px;font-weight:bold;">${texteDisponibilite(j)}${j.dateMajBlessure ? " • MAJ " + j.dateMajBlessure : ""}${j.gravite ? " • " + j.gravite : ""}</div>` : "")}
                 </div>
 
-                ${infoDispo}
-
-                <div class="stats">
-
-                    <div class="stat">
-                        <small>Score</small>
-                        <strong>${score(j).toFixed(1)}</strong>
-                    </div>
-
-                    <div class="stat">
-                        <small>Valeur</small>
-                        <strong>${v} M€</strong>
-                    </div>
-
-                    <div class="stat">
-                        <small>Prix attendu</small>
-                        <strong>${p} M€</strong>
-                    </div>
-
-                </div>
-
-                <div class="bid">
-
-                    🎯 <b>Enchère conseillée :</b>
-                    <span class="good">${conseil} M€</span>
-                    <br>
-
-                    🔴 <b>Plafond ajusté :</b>
-                    <span class="warning">${maxBudget} M€</span>
-                    ${facteurDisponibilite(j) < 1 ? `<br>🚑 <b>Coefficient disponibilité :</b> ${(facteurDisponibilite(j)*100).toFixed(0)}%` : ""}
-                    <br>
-
-                    📊 Rapport valeur/prix :
-                    <b>${ratio}</b>
-                    <br>
-
-                    📈 Marge estimée :
-                    <span class="${marge >= 0 ? "good" : "danger"}">
-                        ${marge >= 0 ? "+" : ""}${marge} M€
-                    </span>
-
+                <div class="badge ${pr[1]}">
+                    ${pr[0]}
                 </div>
 
             </div>
+
+            <div class="stats">
+
+                <div class="stat">
+                    <small>Score</small>
+                    <strong>${score(j).toFixed(1)}</strong>
+                </div>
+
+                <div class="stat">
+                    <small>Valeur</small>
+                    <strong>${v} M€</strong>
+                </div>
+
+                <div class="stat">
+                    <small>Prix attendu</small>
+                    <strong>${p} M€</strong>
+                </div>
+
+            </div>
+
+            <div class="bid">
+
+                🎯 <b>Enchère conseillée :</b>
+                <span class="good">
+                    ${Math.min(max, p + 4)} M€
+                </span>
+                <br>
+
+                🔴 <b>Plafond :</b>
+                <span class="warning">
+                    ${max} M€
+                </span>
+                <br>
+
+                📊 Rapport valeur/prix :
+                <b>${ratio}</b>
+                ${facteurDisponibilite(j) < 1 ? `<br>🚑 <b>Coefficient disponibilité :</b> ${(facteurDisponibilite(j)*100).toFixed(0)}%` : ""}
+
+            </div>
+
+        </div>
+
         `;
+
     });
+
 }
+
 
 function analyser(){
 
@@ -1213,13 +839,109 @@ function mettreAJourEtatLigue(){
         .textContent = joueursDisponibles;
 }
 
+
+
+const CHAMPS_CATALOGUE = [
+    "nom","club","poste","note","temps","buts","passes","regularite","prix","nouveau",
+    "coteMPG","prixMPG","blesse","dateMajBlessure","dureeAbsenceEstimee","retourEstime",
+    "gravite","statutDispo","suspendu","statutTitulaire","impactMercato"
+];
+
+function normaliserJoueurImport(j){
+    const x = Object.assign({}, j);
+    x.nom = String(x.nom || "").trim();
+    x.club = String(x.club || "").trim();
+    x.poste = String(x.poste || "").trim().toUpperCase();
+    ["note","temps","buts","passes","regularite","prix","coteMPG","prixMPG"].forEach(k => {
+        if(x[k] !== "" && x[k] != null && isFinite(Number(String(x[k]).replace(",","."))))
+            x[k] = Number(String(x[k]).replace(",","."));
+        else if(x[k] === "") x[k] = null;
+    });
+    ["nouveau","blesse","suspendu"].forEach(k => {
+        const v = String(x[k] ?? "").toLowerCase().trim();
+        x[k] = x[k] === true || v === "true" || v === "1" || v === "oui" || v === "yes";
+    });
+    x.statutDispo = x.statutDispo || (x.blesse || x.suspendu ? "OUT" : "DISPONIBLE");
+    return x;
+}
+
+function parserLigneCSV(ligne, delim){
+    const valeurs=[]; let courant=""; let guillemets=false;
+    for(let i=0;i<ligne.length;i++){
+        const c=ligne[i];
+        if(c==='"'){
+            if(guillemets && ligne[i+1]==='"'){courant+='"';i++;}
+            else guillemets=!guillemets;
+        }else if(c===delim && !guillemets){valeurs.push(courant.trim());courant="";}
+        else courant+=c;
+    }
+    valeurs.push(courant.trim());
+    return valeurs;
+}
+
+function parserCSV(text){
+    const lignes=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(l=>l.trim());
+    if(!lignes.length) return [];
+    const premiere=lignes[0];
+    const delim=premiere.includes(";")?";":premiere.includes("\t")?"\t":",";
+    const entetes=parserLigneCSV(lignes.shift(),delim).map(h=>h.toLowerCase().trim().replace(/\s+/g,""));
+    return lignes.map(l=>{
+        const vals=parserLigneCSV(l,delim), obj={};
+        entetes.forEach((h,i)=>obj[h]=vals[i] ?? "");
+        return normaliserJoueurImport(obj);
+    }).filter(j=>j.nom);
+}
+
+async function importerCatalogue(){
+    const input=document.getElementById("fichierImport");
+    const fichier=input.files[0];
+    if(!fichier){alert("Sélectionne d'abord le fichier CSV à importer.");return;}
+    const texte=await fichier.text();
+    let entrants;
+    try{
+        entrants=fichier.name.toLowerCase().endsWith(".json")
+            ? JSON.parse(texte).map(normaliserJoueurImport)
+            : parserCSV(texte);
+    }catch(e){
+        document.getElementById("importResult").innerHTML='<div class="bid" style="color:var(--red);">❌ Import impossible : fichier CSV/JSON invalide.</div>';
+        return;
+    }
+    let ajouts=0, misesAJour=0;
+    entrants.forEach(nouveau=>{
+        const index=joueurs.findIndex(j=>j.nom.toLowerCase()===nouveau.nom.toLowerCase());
+        if(index===-1){joueurs.push(nouveau);ajouts++;}
+        else{joueurs[index]=Object.assign({},joueurs[index],nouveau);misesAJour++;}
+    });
+    document.getElementById("importResult").innerHTML=`<div class="bid" style="color:var(--green);">✅ ${entrants.length} joueur(s) traité(s) — ${ajouts} ajout(s), ${misesAJour} mise(s) à jour.<br>🔒 Les 10 managers et leurs effectifs n'ont pas été modifiés.</div>`;
+    mettreAJourEtatLigue();
+    afficherJoueurs();
+}
+
+function telechargerModele(){
+    const entetes=CHAMPS_CATALOGUE.join(";");
+    const exemple=["Nom Exemple","PSG","A","7.0","90","20","10","15","30","false","","","false","","","","","DISPONIBLE","false","INCONNU","FAIBLE"].join(";");
+    telechargerTexte("modele-catalogue-mpg-2026-27.csv", "\uFEFF"+entetes+"\n"+exemple, "text/csv;charset=utf-8");
+}
+
+function exporterCatalogue(){
+    const lignes=[CHAMPS_CATALOGUE.join(";")];
+    joueurs.forEach(j=>lignes.push(CHAMPS_CATALOGUE.map(k=>{
+        const v=String(j[k] ?? "");
+        return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    }).join(";")));
+    telechargerTexte("catalogue-mpg-2026-27-export.csv", "\uFEFF"+lignes.join("\n"), "text/csv;charset=utf-8");
+}
+
+function telechargerTexte(nom,contenu,type){
+    const blob=new Blob([contenu],{type});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=nom;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 mettreAJourEtatLigue();
 afficherJoueurs();
-mettreAJourImportStatus(
-    joueurs.length
-        ? `Catalogue local chargé : ${joueurs.length} joueur(s).`
-        : "Aucun catalogue importé. Le catalogue actuel contient 0 joueur. Les champs blessure/disponibilité sont disponibles."
-);
 
 </script>
 
