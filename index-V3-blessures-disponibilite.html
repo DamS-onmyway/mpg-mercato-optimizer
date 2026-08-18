@@ -205,6 +205,28 @@ button{
     color:var(--red);
 }
 
+.availability{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:10px;
+    background:#11182b;
+    border-left:4px solid var(--orange);
+    font-size:13px;
+    line-height:1.45;
+}
+
+.availability.good{
+    border-left-color:var(--green);
+}
+
+.availability.danger{
+    border-left-color:var(--red);
+}
+
+.availability strong{
+    color:var(--text);
+}
+
 .footer{
     color:var(--muted);
     text-align:center;
@@ -551,7 +573,8 @@ const catalogueClubs = [('Angers SCO', 'ANG'), ('AJ Auxerre', 'AJA'), ('Stade Br
 // -------------------------
 // Import / synchronisation du catalogue
 // -------------------------
-const CATALOGUE_STORAGE_KEY = "mpg_catalogue_2026_27_v2";
+const CATALOGUE_STORAGE_KEY = "mpg_catalogue_2026_27_v3";
+const LEGACY_CATALOGUE_STORAGE_KEYS = ["mpg_catalogue_2026_27_v2", "mpg_catalogue_2026_27"];
 
 function normaliserTexte(v){
     return String(v ?? "")
@@ -614,31 +637,72 @@ function normaliserClub(v){
     return aliases[t] || brut;
 }
 
+function normaliserDureeAbsence(v){
+    const brut = String(v ?? "").trim();
+    if(!brut) return { texte:"", semaines:null };
+
+    const t = normaliserTexte(brut).replace(/,/g, ".");
+    const match = t.match(/(\d+(?:\.\d+)?)\s*(semaine|semaines|sem|week|weeks|w|mois|month|months|m)?/);
+    if(!match) return { texte:brut, semaines:null };
+
+    const nombre = Number(match[1]);
+    if(!Number.isFinite(nombre)) return { texte:brut, semaines:null };
+
+    const unite = match[2] || "semaines";
+    let semaines = nombre;
+    if(["mois","month","months"].includes(unite)) semaines = nombre * 4.345;
+    return { texte:brut, semaines:Math.round(semaines * 10) / 10 };
+}
+
+function normaliserStatutDispo(v){
+    const t = normaliserTexte(v);
+    if(!t) return "DISPONIBLE";
+    if(["out","indisponible","indisponible temporairement","absent","blesse","blessure"].includes(t)) return "OUT";
+    if(["incertain","douteux","questionable","50-50","a confirmer","a confirmer"].includes(t)) return "INCERTAIN";
+    if(["disponible","ok","fit","apte","present"].includes(t)) return "DISPONIBLE";
+    return String(v ?? "").trim().toUpperCase();
+}
+
+function normaliserGravite(v){
+    const t = normaliserTexte(v);
+    if(!t) return "";
+    if(t.includes("long") || t.includes("grave") || t.includes("serieuse")) return "LONGUE";
+    if(t.includes("moy")) return "MOYENNE";
+    if(t.includes("court") || t.includes("legere")) return "COURTE";
+    return String(v ?? "").trim().toUpperCase();
+}
+
 function normaliserJoueur(raw){
-    const j = {
+    const duree = normaliserDureeAbsence(raw.dureeAbsenceEstimee ?? raw.dureeAbsence ?? raw.absence ?? raw.injuryDuration ?? "");
+    const suspendu = normaliserBooleen(raw.suspendu ?? raw.suspension ?? raw.suspended ?? false);
+    const blesse = normaliserBooleen(raw.blesse ?? raw.blesseActuellement ?? raw.injured ?? false);
+    let statutDispo = normaliserStatutDispo(raw.statutDispo ?? raw.disponibilite ?? raw.status ?? "");
+    if(suspendu) statutDispo = "SUSPENDU";
+    else if(blesse) statutDispo = "OUT";
+
+    return {
         nom: String(raw.nom ?? raw.name ?? raw.joueur ?? raw.player ?? "").trim(),
         club: normaliserClub(raw.club ?? raw.equipe ?? raw.team),
         poste: normaliserPoste(raw.poste ?? raw.position ?? raw.pos),
-        cote: normaliserNombre(raw.cote ?? raw.coteMpg ?? raw.value ?? raw.rating),
-        prix: normaliserNombre(raw.prix ?? raw.prixMpg ?? raw.price ?? raw.enchere),
+        cote: normaliserNombre(raw.cote ?? raw.coteMpg ?? raw.coteMPG ?? raw.value ?? raw.rating),
+        prix: normaliserNombre(raw.prix ?? raw.prixMpg ?? raw.prixMPG ?? raw.price ?? raw.enchere),
         note: normaliserNombre(raw.note ?? raw.noteMpg),
         temps: normaliserNombre(raw.temps ?? raw.titularisation ?? raw.presence),
         buts: normaliserNombre(raw.buts ?? raw.goals),
         passes: normaliserNombre(raw.passes ?? raw.assists),
-        regularite: normaliserNombre(raw.regularite ?? raw.regularity),
+        regularite: normaliserNombre(raw.regularite ?? raw.régularité ?? raw.regularity),
         nouveau: normaliserBooleen(raw.nouveau ?? raw.new ?? false),
-        blesse: normaliserBooleen(raw.blesse ?? raw.blesseActuellement ?? raw.injured ?? false),
+        blesse,
         dateMajBlessure: String(raw.dateMajBlessure ?? raw.dateBlessure ?? raw.injuryUpdate ?? "").trim(),
-        dureeAbsenceEstimee: String(raw.dureeAbsenceEstimee ?? raw.dureeAbsence ?? raw.absence ?? "").trim(),
+        dureeAbsenceEstimee: duree.texte,
+        dureeAbsenceSemaines: duree.semaines,
         retourEstime: String(raw.retourEstime ?? raw.dateRetour ?? raw.returnDate ?? "").trim(),
-        gravite: String(raw.gravite ?? raw.graviteBlessure ?? "").trim(),
-        statutDispo: String(raw.statutDispo ?? raw.disponibilite ?? raw.status ?? "DISPONIBLE").trim().toUpperCase(),
-        impactMercato: String(raw.impactMercato ?? raw.impact ?? "FAIBLE").trim().toUpperCase(),
-        suspendu: normaliserBooleen(raw.suspendu ?? raw.suspension ?? false),
-        statutTitulaire: String(raw.statutTitulaire ?? raw.titularite ?? "INCONNU").trim().toUpperCase()
+        gravite: normaliserGravite(raw.gravite ?? raw.graviteBlessure ?? raw.injurySeverity ?? ""),
+        statutDispo,
+        impactMercato: String(raw.impactMercato ?? raw.impact ?? "").trim().toUpperCase(),
+        suspendu,
+        statutTitulaire: String(raw.statutTitulaire ?? raw.titularite ?? raw.starterStatus ?? "INCONNU").trim().toUpperCase()
     };
-
-    return j;
 }
 
 function joueurValide(j){
@@ -655,11 +719,32 @@ function sauvegarderCatalogue(){
 
 function chargerCatalogueLocal(){
     try{
-        const brut = localStorage.getItem(CATALOGUE_STORAGE_KEY);
+        let brut = localStorage.getItem(CATALOGUE_STORAGE_KEY);
+        let source = CATALOGUE_STORAGE_KEY;
+
+        if(!brut){
+            for(const legacyKey of LEGACY_CATALOGUE_STORAGE_KEYS){
+                const candidate = localStorage.getItem(legacyKey);
+                if(candidate){
+                    brut = candidate;
+                    source = legacyKey;
+                    break;
+                }
+            }
+        }
+
         if(!brut) return;
         const data = JSON.parse(brut);
         if(!Array.isArray(data)) return;
-        data.map(normaliserJoueur).filter(joueurValide).forEach(j => joueurs.push(j));
+
+        const valides = data.map(normaliserJoueur).filter(joueurValide);
+        valides.forEach(j => joueurs.push(j));
+
+        // Migration silencieuse : on conserve le catalogue existant et on le
+        // recopie dans le stockage V3 avec les nouveaux champs normalisés.
+        if(source !== CATALOGUE_STORAGE_KEY && valides.length){
+            sauvegarderCatalogue();
+        }
     }catch(e){
         console.warn("Catalogue local impossible à charger", e);
     }
@@ -718,20 +803,20 @@ function parserCatalogueCSV(text){
         nom:["nom","name","joueur","player"],
         club:["club","equipe","équipe","team"],
         poste:["poste","position","pos"],
-        cote:["cote","cote mpg","cote mpg m€","value","rating"],
-        prix:["prix","prix mpg","price","enchere","enchère"],
+        cote:["cote","cote mpg","cote mpg m€","cotempg","value","rating"],
+        prix:["prix","prix mpg","prixmpg","price","enchere","enchère"],
         note:["note","note mpg"],
         temps:["temps","titularisation","presence","présence"],
         buts:["buts","goals"],
         passes:["passes","assists"],
         regularite:["regularite","régularité","regularity"],
         nouveau:["nouveau","new"],
-        blesse:["blesse","blessé","blesse actuellement","injured"],
+        blesse:["blesse","blessé","blesse actuellement","injured","injured currently"],
         dateMajBlessure:["dateMajBlessure","date maj blessure","date blessure","injury update"],
-        dureeAbsenceEstimee:["dureeAbsenceEstimee","durée absence estimée","duree absence","absence","injury duration"],
-        retourEstime:["retourEstime","retour estimé","date retour","return date"],
-        gravite:["gravite","gravité","gravite blessure","injury severity"],
-        statutDispo:["statutDispo","statut dispo","disponibilite","disponibilité","status"],
+        dureeAbsenceEstimee:["dureeAbsenceEstimee","durée absence estimée","duree absence","absence","injury duration","injury duration estimated","absence weeks","duree semaines"],
+        retourEstime:["retourEstime","retour estimé","date retour","return date","estimated return"],
+        gravite:["gravite","gravité","gravite blessure","injury severity","severity"],
+        statutDispo:["statutDispo","statut dispo","disponibilite","disponibilité","status","availability","statut disponibilité"],
         impactMercato:["impactMercato","impact mercato","impact"],
         suspendu:["suspendu","suspension","suspended"],
         statutTitulaire:["statutTitulaire","statut titulaire","titularite","titularité","starter status"]
@@ -830,7 +915,7 @@ function chargerFichierCatalogue(){
 function telechargerModeleCSV(){
     const contenu = [
         "nom;club;poste;cote;prix;note;temps;buts;passes;regularite;nouveau;blesse;dateMajBlessure;dureeAbsenceEstimee;retourEstime;gravite;statutDispo;impactMercato;suspendu;statutTitulaire",
-        "Joueur Exemple;Paris Saint-Germain;A;20;24;7,2;90;10;5;85;false;true;17/08/2026;2-3 semaines;05/09/2026;moyenne;OUT;MOYEN;false;TITULAIRE"
+        "Joueur Exemple;Paris Saint-Germain;A;20;24;7,2;90;10;5;85;false;true;18/08/2026;2-3 semaines;05/09/2026;MOYENNE;OUT;MOYEN;false;TITULAIRE"
     ].join("\\n");
     telechargerTexte(contenu, "modele_catalogue_mpg_2026_27.csv", "text/csv;charset=utf-8");
 }
@@ -907,23 +992,44 @@ function valeur(j){
 
 
 function facteurDisponibilite(j){
-    let facteur = 1;
+    if(j.suspendu || j.statutDispo === "SUSPENDU") return 0.85;
+    if(j.statutDispo === "INCERTAIN") return 0.85;
+    if(!(j.blesse || j.statutDispo === "OUT")) return 1;
 
-    if(j.blesse || j.statutDispo === "OUT") {
-        const gravite = normaliserTexte(j.gravite);
-        if(gravite.includes("long")) facteur = 0.55;
-        else if(gravite.includes("moy")) facteur = 0.72;
-        else facteur = 0.85;
-
-        const duree = normaliserTexte(j.dureeAbsenceEstimee);
-        if(/(?:4|5|6|7|8|9|[1-9][0-9])\s*sem/.test(duree)) facteur = Math.min(facteur, 0.60);
-        else if(/(?:2|3)\s*sem/.test(duree)) facteur = Math.min(facteur, 0.75);
-        else if(/1\s*sem/.test(duree)) facteur = Math.min(facteur, 0.88);
+    const semaines = Number(j.dureeAbsenceSemaines);
+    if(Number.isFinite(semaines)){
+        if(semaines >= 8) return 0.50;
+        if(semaines >= 4) return 0.60;
+        if(semaines >= 2) return 0.75;
+        if(semaines >= 1) return 0.88;
     }
 
-    if(j.suspendu) facteur = Math.min(facteur, 0.85);
-    if(j.statutDispo === "INCERTAIN") facteur = Math.min(facteur, 0.85);
-    return facteur;
+    const gravite = normaliserTexte(j.gravite);
+    if(gravite.includes("long") || gravite.includes("grave")) return 0.60;
+    if(gravite.includes("moy")) return 0.72;
+    if(gravite.includes("court") || gravite.includes("leger")) return 0.88;
+    return 0.85;
+}
+
+function libelleDisponibilite(j){
+    if(j.suspendu || j.statutDispo === "SUSPENDU") return "⛔ Suspendu";
+    if(j.blesse || j.statutDispo === "OUT") return "🚑 Blessé";
+    if(j.statutDispo === "INCERTAIN") return "❓ Disponibilité incertaine";
+    return "🟢 Disponible";
+}
+
+function detailsDisponibilite(j){
+    const f = facteurDisponibilite(j);
+    const indispo = f < 1;
+    const classe = f <= 0.60 ? "danger" : indispo ? "warning" : "good";
+    const morceaux = [libelleDisponibilite(j)];
+    if(j.dureeAbsenceEstimee) morceaux.push(`Absence estimée : <b>${j.dureeAbsenceEstimee}</b>`);
+    if(j.retourEstime) morceaux.push(`Retour estimé : <b>${j.retourEstime}</b>`);
+    if(j.gravite) morceaux.push(`Gravité : <b>${j.gravite}</b>`);
+    if(j.dateMajBlessure) morceaux.push(`MAJ : ${j.dateMajBlessure}`);
+    if(j.impactMercato) morceaux.push(`Impact mercato : <b>${j.impactMercato}</b>`);
+    if(indispo) morceaux.push(`Coefficient : <b>${Math.round(f*100)}%</b>`);
+    return `<div class="availability ${classe}">${morceaux.join(" • ")}</div>`;
 }
 
 function prixAttendu(j){
@@ -1077,14 +1183,9 @@ function afficherJoueurs(){
         const ratio = (v/p).toFixed(2);
         const marge = v - p;
 
-        const indisponible = j.blesse || j.suspendu || j.statutDispo === "OUT" || j.statutDispo === "INCERTAIN";
-        const infoDispo = indisponible ? `
-                    <div class="bid ${facteurDisponibilite(j) < 0.65 ? "danger" : "warning"}">
-                        ${j.suspendu ? "⛔ Suspendu" : (j.blesse || j.statutDispo === "OUT") ? "🚑 Blessé" : "❓ Disponibilité incertaine"}
-                        ${j.dureeAbsenceEstimee ? ` • Absence : <b>${j.dureeAbsenceEstimee}</b>` : ""}
-                        ${j.retourEstime ? ` • Retour estimé : <b>${j.retourEstime}</b>` : ""}
-                        ${j.dateMajBlessure ? ` • MAJ : ${j.dateMajBlessure}` : ""}
-                    </div>` : "";
+        const infoDispo = (facteurDisponibilite(j) < 1 || j.dateMajBlessure || j.dureeAbsenceEstimee || j.retourEstime || j.gravite || j.impactMercato)
+            ? detailsDisponibilite(j)
+            : "";
 
         zone.innerHTML += `
             <div class="player">
@@ -1136,7 +1237,7 @@ function afficherJoueurs(){
 
                     🔴 <b>Plafond ajusté :</b>
                     <span class="warning">${maxBudget} M€</span>
-                    ${facteurDisponibilite(j) < 1 ? `<br>🚑 <b>Coefficient disponibilité :</b> ${(facteurDisponibilite(j)*100).toFixed(0)}%` : ""}
+                    ${facteurDisponibilite(j) < 1 ? `<br>📦 <b>Coefficient disponibilité :</b> ${(facteurDisponibilite(j)*100).toFixed(0)}%` : ""}
                     <br>
 
                     📊 Rapport valeur/prix :
