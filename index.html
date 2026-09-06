@@ -843,10 +843,10 @@ function afficherJoueurs(){
                     </div>
 
                     <div class="bid">
-                        📋 Données MPG manquantes.
+                        📋 Statistiques insuffisantes pour calculer la valeur.
                         <br>
-                        Cote MPG : <b>—</b>
-                        • Prix : <b>—</b>
+                        Cote MPG : <b>${j.coteMPG != null ? j.coteMPG : "—"}</b>
+                        • Prix : <b>${j.prix != null ? j.prix + " M€" : "—"}</b>
                     </div>
 
                 </div>
