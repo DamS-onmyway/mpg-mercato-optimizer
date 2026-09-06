@@ -223,6 +223,20 @@ code{
     color:var(--red);
 }
 
+
+.injury-status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700;margin-left:6px;background:#273252;color:#cbd5f5}
+.injury-status.injured{background:rgba(255,93,108,.18);color:#ff8b96}
+.injury-status.recovering{background:rgba(255,184,77,.18);color:#ffc96f}
+.injury-status.doubtful{background:rgba(93,169,255,.18);color:#8cc4ff}
+.injury-status.ok{background:rgba(55,214,122,.15);color:#72e79e}
+.injury-panel{border:1px solid #273252;border-radius:14px;padding:14px;margin-top:12px;background:#11182c}
+.injury-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.injury-grid input,.injury-grid select{width:100%;padding:10px;border-radius:10px;border:1px solid #33405f;background:#0d1427;color:var(--text)}
+.injury-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.injury-note{font-size:12px;color:var(--muted);line-height:1.5}
+.injury-impact{font-weight:700}
+@media(max-width:650px){.injury-grid{grid-template-columns:1fr}}
+
 .footer{
     color:var(--muted);
     text-align:center;
@@ -369,6 +383,26 @@ code{
         <div id="importMessage" class="import-message"></div>
         <div class="import-message">💡 Le fichier Excel est lu directement dans le navigateur. Les données historiques du mercato restent intégrées à l'application.</div>
     </div>
+</div>
+
+<div class="card">
+    <h2>🏥 État physique & blessures</h2>
+    <p class="club">Les données physiques sont stockées séparément du catalogue MPG et de l’historique. Elles peuvent donc être mises à jour sans modifier tes données importées.</p>
+    <div class="injury-grid">
+        <div><label>Joueur</label><input id="blessureNom" type="text" placeholder="Ex. Brice Samba"></div>
+        <div><label>Statut</label><select id="blessureStatut"><option value="available">🟢 Disponible</option><option value="injured">🔴 Blessé</option><option value="recovering">🟠 Reprise / retour récent</option><option value="doubtful">🟡 Incertain</option></select></div>
+        <div><label>Type / motif</label><input id="blessureType" type="text" placeholder="Ex. ischio, genou, maladie..."></div>
+        <div><label>Retour estimé</label><input id="blessureRetour" type="date"></div>
+        <div><label>Retour en forme estimé</label><input id="blessureForme" type="date"></div>
+        <div><label>Incertitude</label><select id="blessureRisque"><option value="low">Faible</option><option value="medium">Moyenne</option><option value="high">Élevée</option></select></div>
+    </div>
+    <div class="injury-actions">
+        <button class="primary" type="button" onclick="enregistrerBlessure()">💾 Enregistrer / mettre à jour</button>
+        <button class="secondary" type="button" onclick="supprimerBlessure()">🗑️ Supprimer la fiche</button>
+        <button class="secondary" type="button" onclick="afficherBlessures()">🔄 Actualiser la liste</button>
+    </div>
+    <p class="injury-note">La décote agit sur le <b>prix attendu et l’enchère</b>, pas sur la valeur sportive de base. Une date de retour reste une estimation et le niveau de risque peut renforcer la décote.</p>
+    <div id="listeBlessures" style="margin-top:14px"></div>
 </div>
 
 <div id="resultats"></div>
@@ -962,6 +996,95 @@ function effacerCatalogue(){
 
 
 
+const CLE_BLESSURES = "mpg_blessures_2026_27";
+let blessures = JSON.parse(localStorage.getItem(CLE_BLESSURES) || "{}");
+
+function sauvegarderBlessures(){
+    localStorage.setItem(CLE_BLESSURES, JSON.stringify(blessures));
+}
+
+function cleBlessure(nom){ return cleNom(nom); }
+
+function joursEntre(a,b){
+    if(!a || !b) return null;
+    const d1=new Date(a+"T12:00:00"), d2=new Date(b+"T12:00:00");
+    return Math.ceil((d2-d1)/86400000);
+}
+
+function statutPhysique(j){
+    const f=blessures[cleBlessure(j.nom)];
+    if(!f) return {statut:"available", facteur:1, label:"🟢 Disponible", detail:"Aucune fiche physique"};
+    const aujourd=new Date().toISOString().slice(0,10);
+    let statut=f.statut || "available";
+    let facteur=1;
+    if(statut === "injured"){
+        const jours=f.retour ? joursEntre(aujourd,f.retour) : null;
+        if(jours === null) facteur=0.65;
+        else if(jours <= 0) facteur=0.90;
+        else if(jours <= 14) facteur=0.90;
+        else if(jours <= 28) facteur=0.80;
+        else if(jours <= 56) facteur=0.68;
+        else facteur=0.55;
+    } else if(statut === "recovering"){
+        const joursForme=f.forme ? joursEntre(aujourd,f.forme) : null;
+        facteur = joursForme === null ? 0.90 : (joursForme <= 0 ? 0.96 : joursForme <= 14 ? 0.90 : 0.82);
+    } else if(statut === "doubtful"){
+        facteur=0.88;
+    }
+    if(f.risque === "medium") facteur *= 0.96;
+    if(f.risque === "high") facteur *= 0.90;
+    facteur=Math.max(0.45,Math.min(1,facteur));
+    const retour=f.retour ? new Date(f.retour+"T12:00:00").toLocaleDateString("fr-FR") : "non défini";
+    const forme=f.forme ? new Date(f.forme+"T12:00:00").toLocaleDateString("fr-FR") : null;
+    const labels={injured:"🔴 Blessé",recovering:"🟠 Reprise / retour récent",doubtful:"🟡 Incertain",available:"🟢 Disponible"};
+    return {statut,facteur,label:labels[statut]||"🟢 Disponible",detail:`Retour : ${retour}${forme ? ` • Forme estimée : ${forme}` : ""}`,fiche:f};
+}
+
+function enregistrerBlessure(){
+    const nom=document.getElementById("blessureNom").value.trim();
+    if(!nom){alert("Indique un joueur.");return;}
+    const joueur=joueurCatalogue(nom);
+    const cle=cleBlessure(nom);
+    blessures[cle]={
+        nom: joueur?.nom || nom,
+        statut:document.getElementById("blessureStatut").value,
+        type:document.getElementById("blessureType").value.trim(),
+        retour:document.getElementById("blessureRetour").value,
+        forme:document.getElementById("blessureForme").value,
+        risque:document.getElementById("blessureRisque").value,
+        maj:new Date().toISOString().slice(0,10)
+    };
+    sauvegarderBlessures(); afficherBlessures(); afficherJoueurs();
+}
+
+function chargerBlessureDansFormulaire(nom){
+    const f=blessures[cleBlessure(nom)]; if(!f) return;
+    document.getElementById("blessureNom").value=f.nom||nom;
+    document.getElementById("blessureStatut").value=f.statut||"available";
+    document.getElementById("blessureType").value=f.type||"";
+    document.getElementById("blessureRetour").value=f.retour||"";
+    document.getElementById("blessureForme").value=f.forme||"";
+    document.getElementById("blessureRisque").value=f.risque||"low";
+}
+
+function supprimerBlessure(){
+    const nom=document.getElementById("blessureNom").value.trim();
+    if(!nom) return;
+    delete blessures[cleBlessure(nom)]; sauvegarderBlessures(); afficherBlessures(); afficherJoueurs();
+}
+
+function afficherBlessures(){
+    const zone=document.getElementById("listeBlessures"); if(!zone) return;
+    const vals=Object.values(blessures).sort((a,b)=>String(a.nom).localeCompare(String(b.nom),"fr"));
+    if(!vals.length){ zone.innerHTML='<div class="bid">Aucune fiche physique enregistrée. Les joueurs sans fiche restent neutres.</div>'; return; }
+    zone.innerHTML=vals.map(f=>{
+        const j=joueurCatalogue(f.nom); const info=statutPhysique(j||{nom:f.nom});
+        return `<div class="player"><div class="player-top"><div><div class="player-name">${f.nom} <span class="injury-status ${f.statut}">${info.label}</span></div><div class="club">${f.type||"État physique suivi"} • MAJ ${f.maj||"—"}</div></div><div class="badge ${info.facteur>=.9?"A":"B"}">x${info.facteur.toFixed(2)}</div></div><div class="bid">${info.detail}${f.risque?` • Risque : <b>${f.risque}</b>`:""}<br><span class="injury-impact">Impact enchère : ${(1-info.facteur)*100 > 0 ? `-${((1-info.facteur)*100).toFixed(0)} % environ` : "aucune décote"}</span><br><button class="secondary" type="button" onclick='chargerBlessureDansFormulaire(${JSON.stringify(f.nom)})'>✏️ Modifier</button></div></div>`;
+    }).join("");
+}
+
+function facteurBlessure(j){ return statutPhysique(j).facteur; }
+
 function moyenneNotesJournees(j){
     const notes=j?.notesJournees || {};
     const valeurs=[];
@@ -1042,9 +1165,10 @@ function prixAttendu(j){
     if(j.nouveau)
         inflation += 0.05;
 
-    return Math.round(
-        Math.max(j.prix, v * inflation * 0.65)
-    );
+    const prixBase = Math.max(j.prix, v * inflation * 0.65);
+    // La blessure influence le prix de marché, pas la valeur sportive de base.
+    const facteurPhysique = facteurBlessure(j);
+    return Math.round(Math.max(j.prix, prixBase * facteurPhysique));
 }
 
 
@@ -1213,6 +1337,7 @@ function afficherJoueurs(){
                             ${j.club}
                             • ${j.poste}
                             ${j.nouveau ? " • 🆕 2026/27" : ""}
+                            <span class="injury-status ${statutPhysique(j).statut}">${statutPhysique(j).label}</span>
                         </div>
                     </div>
 
@@ -1253,6 +1378,10 @@ function afficherJoueurs(){
 
                     📊 Rapport valeur/prix :
                     <b>${ratio}</b>
+                    <br>
+
+                    🏥 État physique : <b>${statutPhysique(j).label}</b>
+                    ${statutPhysique(j).fiche ? ` • ${statutPhysique(j).detail} • facteur ${statutPhysique(j).facteur.toFixed(2)}` : ""}
                     <br>
 
                     📈 Marge estimée :
@@ -1373,6 +1502,7 @@ function mettreAJourEtatLigue(){
 mettreAJourEtatLigue();
 afficherJoueurs();
 afficherHistoriqueManagers();
+afficherBlessures();
 
 </script>
 
