@@ -357,11 +357,11 @@ code{
     <button class="primary" type="button" onclick="importerCatalogue()">📥 Importer</button>
 
     <div class="bid">
-        <b>Colonnes :</b>
-        <code>nom</code>, <code>club</code>, <code>poste</code>,
-        <code>coteMPG</code>, <code>prixMPG</code>, <code>note</code>,
-        <code>temps</code>, <code>buts</code>, <code>passes</code>,
-        <code>regularite</code>, <code>nouveau</code>
+        <b>Données MPG reconnues :</b>
+        <code>Joueur</code>, <code>Club</code>, <code>Poste</code>, <code>Cote</code>,
+        <code>Note</code>, <code>Buts</code>, <code>%Titu</code>, <code>D1-D3</code>,
+        <code>D-4 à D-34</code>, <code>DMI</code>, <code>Victoire probable</code>,
+        <code>Indispo ?</code>
         <br><br>
         <button class="secondary" type="button" onclick="telechargerModeleCSV()">⬇️ Modèle CSV</button>
         <button class="secondary" type="button" onclick="exporterCatalogue()">💾 Exporter</button>
@@ -759,6 +759,11 @@ function normaliserJoueur(raw){
         buts:nombreValeur(get("buts","goals")),
         passes:nombreValeur(get("passes","assists")),
         regularite:nombreValeur(get("regularite","régularité")),
+        pctTitu:nombreValeur(get("pctTitu","Titu","%Titu")),
+        indisponible:get("indisponible","Indispo ?","Indispo"),
+        victoireProbable:get("victoireProbable","Victoire probable"),
+        notesJournees:raw.notesJournees || {},
+        dmi:nombreValeur(get("dmi","DMI")),
         nouveau:["true","oui","1","yes"].includes(String(get("nouveau")).toLowerCase())
     };
 }
@@ -837,6 +842,14 @@ function adapterColonnesImport(raw){
     out.pctTitu=get("%Titu","Titu","pctTitu");
     out.indisponible=get("Indispo ?","Indispo","indisponible");
     out.victoireProbable=get("Victoire probable","victoireProbable");
+
+    // Les colonnes D1, D2, D3 et D-4...D-34 sont conservées comme notes
+    // de journées. On ne les transforme pas en statistiques inventées.
+    out.notesJournees={};
+    Object.keys(map).forEach(k=>{
+        if(/^d\d+$/.test(k)) out.notesJournees[k]=map[k];
+    });
+    out.dmi=get("DMI","dmi");
     return out;
 }
 
@@ -941,29 +954,56 @@ function effacerCatalogue(){
 
 
 
-function score(j){
+function moyenneNotesJournees(j){
+    const notes=j?.notesJournees || {};
+    const valeurs=[];
 
-    // Tant que les données MPG réelles ne sont pas disponibles,
-    // on n'invente aucune note.
-    if(
-        j.note == null ||
-        j.temps == null ||
-        j.buts == null ||
-        j.passes == null ||
-        j.regularite == null
-    ){
-        return null;
-    }
+    Object.keys(notes).forEach(k=>{
+        const n=nombreValeur(notes[k]);
+        if(n != null && n >= 0 && n <= 10) valeurs.push(n);
+    });
 
-    return (
-        j.note * 8 +
-        j.temps * 0.20 +
-        j.buts * 0.20 +
-        j.passes * 0.12 +
-        j.regularite * 0.15
-    );
+    if(!valeurs.length) return null;
+    return valeurs.reduce((a,b)=>a+b,0)/valeurs.length;
 }
 
+function moyenneNotesRecentes(j){
+    const notes=j?.notesJournees || {};
+    const recentes=["d1","d2","d3"]
+        .map(k=>nombreValeur(notes[k]))
+        .filter(n=>n != null && n >= 0 && n <= 10);
+
+    if(!recentes.length) return null;
+    return recentes.reduce((a,b)=>a+b,0)/recentes.length;
+}
+
+function score(j){
+    // Première version basée uniquement sur les vraies colonnes du fichier MPG.
+    // La Note reste le socle. %Titu, buts et notes de journées complètent le score
+    // lorsqu'ils sont disponibles. Aucune donnée manquante n'est inventée.
+    const note=nombreValeur(j.note);
+    if(note == null) return null;
+
+    let s=note * 8;
+
+    const titu=nombreValeur(j.pctTitu);
+    if(titu != null) s += Math.max(0,Math.min(100,titu)) * 0.08;
+
+    const buts=nombreValeur(j.buts);
+    if(buts != null) s += Math.max(0,buts) * 0.45;
+
+    const recent=moyenneNotesRecentes(j);
+    const moyenne=moyenneNotesJournees(j);
+    if(recent != null) s += recent * 1.8;
+    else if(moyenne != null) s += moyenne * 1.2;
+
+    // Un joueur explicitement indisponible reçoit une pénalité modérée,
+    // sans annuler sa valeur sportive.
+    const indispo=String(j.indisponible ?? "").trim().toLowerCase();
+    if(["oui","yes","true","1","indisponible"].includes(indispo)) s *= 0.75;
+
+    return s;
+}
 
 function valeur(j){
 
@@ -1098,9 +1138,8 @@ function afficherJoueurs(){
             <div class="card">
                 <h2>📋 Catalogue MPG à compléter</h2>
                 <p>
-                    Le catalogue Ligue 1 2026/27 est prêt au niveau des clubs,
-                    mais les joueurs individuels et leurs données MPG ne sont
-                    volontairement pas inventés avant la réouverture de ta ligue.
+                    Le catalogue MPG est importé. Certains joueurs peuvent toutefois ne pas avoir
+                    de Note exploitable dans le fichier source.
                 </p>
                 <p class="club">
                     Dès que MPG est rouvert, nous pourrons importer les joueurs,
@@ -1135,7 +1174,7 @@ function afficherJoueurs(){
                     </div>
 
                     <div class="bid">
-                        📋 Données MPG manquantes.
+                        📋 Note MPG insuffisante pour calculer la valeur.
                         <br>
                         Cote MPG : <b>${j.coteMPG ?? "—"}</b>
                         • Prix actuel : <b>${j.prix ?? "—"} M€</b>
