@@ -241,6 +241,7 @@ code{
     }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -334,7 +335,7 @@ code{
 <div class="card">
     <h2>📥 Importer le catalogue MPG</h2>
     <p class="club">
-        Importe les joueurs depuis un fichier CSV, TSV ou JSON.
+        Importe les joueurs depuis un fichier Excel (.xlsx/.xls), CSV, TSV ou JSON.
         Les effectifs des 10 managers ne sont pas modifiés.
     </p>
 
@@ -342,7 +343,7 @@ code{
         <div>
             <label>Fichier catalogue</label>
             <input id="catalogueFichier" type="file"
-                   accept=".csv,.tsv,.json,text/csv,application/json">
+                   accept=".xlsx,.xls,.csv,.tsv,.json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json">
         </div>
         <div>
             <label>Mode d'import</label>
@@ -366,6 +367,7 @@ code{
         <button class="secondary" type="button" onclick="exporterCatalogue()">💾 Exporter</button>
         <button class="secondary" type="button" onclick="effacerCatalogue()">🗑️ Effacer le catalogue</button>
         <div id="importMessage" class="import-message"></div>
+        <div class="import-message">💡 Le fichier Excel est lu directement dans le navigateur. Les données historiques du mercato restent intégrées à l'application.</div>
     </div>
 </div>
 
@@ -761,6 +763,16 @@ function normaliserJoueur(raw){
     };
 }
 
+function normaliserCleColonne(v){
+    return String(v || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[%€]/g, "")
+        .replace(/[\s_\-\/().]/g, "");
+}
+
 function parserCSV(texte){
     const lignes=texte.replace(/\r/g,"").split("\n").filter(l=>l.trim());
     if(!lignes.length) return [];
@@ -777,12 +789,55 @@ function parserCSV(texte){
         }
         out.push(cur.trim()); return out;
     };
-    const headers=split(lignes[0]).map(x=>x.toLowerCase().trim());
+    const headers=split(lignes[0]);
     return lignes.slice(1).map(l=>{
         const vals=split(l), obj={};
         headers.forEach((h,i)=>obj[h]=vals[i] ?? "");
         return obj;
     });
+}
+
+function parserExcel(buffer){
+    if(typeof XLSX === "undefined"){
+        throw new Error("Le module Excel n'est pas chargé. Recharge la page puis réessaie.");
+    }
+    const wb=XLSX.read(buffer,{type:"array"});
+    if(!wb.SheetNames.length) return [];
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{defval:""});
+}
+
+function adapterColonnesImport(raw){
+    const map={};
+    Object.keys(raw || {}).forEach(k=> map[normaliserCleColonne(k)] = raw[k]);
+    const get=(...keys)=>{
+        for(const key of keys){
+            const v=map[normaliserCleColonne(key)];
+            if(v !== undefined && v !== null && v !== "") return v;
+        }
+        return "";
+    };
+
+    // Le fichier MPG réel utilise notamment : Joueur, Poste, Cote, Note,
+    // Buts, %Titu, D3...D-34, Club, Victoire probable, Indispo ?
+    // On conserve également les colonnes supplémentaires pour les exploiter plus tard.
+    const out={...raw};
+    out.nom=get("Joueur","nom","name");
+    out.club=get("Club","club","equipe","équipe","team");
+    out.poste=get("Poste","poste","position","pos");
+    out.coteMPG=get("Cote","coteMPG","cote","cote_mpg");
+    out.prixMPG=get("prixMPG","prix_mpg");
+    out.prix=get("prix","prixReference","prixMPG","Cote");
+    out.note=get("Note","note","rating");
+    out.temps=get("Temps","temps","Minutes","minutes");
+    out.buts=get("Buts","buts","goals");
+    out.passes=get("Passes","passes","Assists","assists");
+    out.regularite=get("Regularite","régularité","regularite");
+    out.nouveau=get("Nouveau","nouveau");
+    out.pctTitu=get("%Titu","Titu","pctTitu");
+    out.indisponible=get("Indispo ?","Indispo","indisponible");
+    out.victoireProbable=get("Victoire probable","victoireProbable");
+    return out;
 }
 
 function joueurEstAttribue(joueur){
@@ -824,17 +879,25 @@ async function importerCatalogue(){
     const message=document.getElementById("importMessage");
     if(!fichier){message.textContent="⚠️ Sélectionne d'abord un fichier.";return;}
     try{
-        const texte=await fichier.text();
         const ext=fichier.name.toLowerCase().split(".").pop();
         let data;
-        if(ext==="json"){
-            const parsed=JSON.parse(texte);
-            data=Array.isArray(parsed) ? parsed : (parsed.joueurs || []);
+        if(ext==="xlsx" || ext==="xls"){
+            const buffer=await fichier.arrayBuffer();
+            data=parserExcel(buffer);
         } else {
-            data=parserCSV(texte);
+            const texte=await fichier.text();
+            if(ext==="json"){
+                const parsed=JSON.parse(texte);
+                data=Array.isArray(parsed) ? parsed : (parsed.joueurs || []);
+            } else {
+                data=parserCSV(texte);
+            }
         }
+
+        data=data.map(adapterColonnesImport);
         const importes=data.map(normaliserJoueur).filter(Boolean);
-        if(!importes.length) throw new Error("Aucun joueur exploitable trouvé.");
+        if(!importes.length) throw new Error("Aucun joueur exploitable trouvé. Vérifie la première feuille du fichier.");
+
         if(document.getElementById("modeImport").value==="replace"){
             joueurs=importes;
         } else {
