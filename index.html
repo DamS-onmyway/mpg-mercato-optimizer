@@ -3677,7 +3677,7 @@ async function importerCatalogue(){
   try{
     if(
       fichier &&
-      /\\.(xlsx|xls)$/i.test(fichier.name)
+      /\.(xlsx|xls)$/i.test(fichier.name)
     ){
       if(typeof XLSX === "undefined"){
         throw new Error(
@@ -3844,7 +3844,7 @@ async function lireFichier(){
     return;
   }
 
-  if(/\\.(xlsx|xls)$/i.test(fichier.name)){
+  if(/\.(xlsx|xls)$/i.test(fichier.name)){
     document.getElementById(
       "texteCatalogue"
     ).value = "";
