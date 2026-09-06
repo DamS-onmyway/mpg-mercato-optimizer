@@ -1382,28 +1382,40 @@ function aliasGensBonPour(j){
   const nom = normaliserTexte(j.nom);
   const poste = normaliserPoste(j.poste);
 
-  const candidats = ALIASES_GENS_BON.filter(alias => {
-    if(normaliserTexte(alias.nom) !== nom){
-      return false;
-    }
+  const candidatsNomPoste = ALIASES_GENS_BON.filter(alias =>
+    normaliserTexte(alias.nom) === nom &&
+    alias.poste === poste
+  );
 
-    if(alias.poste !== poste){
-      return false;
-    }
+  if(candidatsNomPoste.length !== 1){
+    return null;
+  }
 
-    if(!alias.clubs.length){
-      return true;
-    }
+  const alias = candidatsNomPoste[0];
 
-    const club = normaliserTexte(j.club);
+  // Pour les homonymes (ex. Diop / Coulibaly), le club reste
+  // nécessaire. Pour un nom unique dans notre effectif, on ne
+  // bloque pas l'identification si le club a changé entre-temps.
+  if(!alias.clubs.length){
+    return alias;
+  }
 
-    return alias.clubs.some(c =>
-      club.includes(normaliserTexte(c))
-    );
-  });
+  const club = normaliserTexte(j.club);
 
-  return candidats.length === 1
-    ? candidats[0]
+  if(alias.clubs.some(c =>
+    club.includes(normaliserTexte(c))
+  )){
+    return alias;
+  }
+
+  const nbHomonymesAlias = ALIASES_GENS_BON.filter(other =>
+    other !== alias &&
+    normaliserTexte(other.nom) === nom &&
+    other.poste === poste
+  ).length;
+
+  return nbHomonymesAlias === 0
+    ? alias
     : null;
 }
 
@@ -3700,9 +3712,10 @@ async function importerCatalogue(){
 
   const aliasesDetectes =
     ALIASES_GENS_BON.filter(alias =>
-      joueurs.some(j =>
-        aliasGensBonPour(j)?.full === alias.full
-      )
+      joueurs.some(j => {
+        const identifie = aliasGensBonPour(j);
+        return identifie?.full === alias.full;
+      })
     );
 
   const aliasesAbsents =
@@ -3722,7 +3735,9 @@ async function importerCatalogue(){
     joueursGensBonAbsents:
       aliasesAbsents.length,
     joueursGensBonAbsentsListe:
-      aliasesAbsents.map(x => x.full)
+      aliasesAbsents.map(x => x.full),
+    joueursGensBonDetectesListe:
+      aliasesDetectes.map(x => x.full)
   };
 
   sauvegarderCatalogue();
