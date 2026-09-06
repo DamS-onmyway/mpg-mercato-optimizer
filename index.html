@@ -562,7 +562,7 @@ footer{
 
 <footer>
 
-  MPG Mercato Optimizer — V6 import catalogue 2026/27
+  MPG Mercato Optimizer — V7 modèle sportif adapté aux données MPGStats 2026/27
   • Modèle de valorisation V1
   • Cote historique février 2026 intégrée
 
@@ -582,7 +582,7 @@ footer{
 ========================================================= */
 
 const CATALOGUE_STORAGE_KEY =
-  "mpg_catalogue_2026_27_v5";
+  "mpg_catalogue_2026_27_v6";
 
 
 const ligue = {
@@ -1230,6 +1230,12 @@ function normaliserJoueur(raw){
       )
     ),
 
+    // Données disponibles dans Joueurs.xlsx : journées MPG D3, D2, D1, D-4...D-34.
+    // Elles servent de proxy pour la forme récente et la régularité lorsque
+    // temps/passes/régularité bruts ne sont pas fournis.
+    formeRecente: null,
+    regulariteCalculee: null,
+
     nouveau: bool(
       get(
         "nouveau",
@@ -1335,6 +1341,8 @@ function normaliserJoueur(raw){
             : "inconnue"
         );
 
+
+  enrichirIndicateursDepuisSource(joueur, raw);
 
   return joueur;
 
@@ -1799,45 +1807,105 @@ function referenceMarche(j){
 
 
 /* =========================================================
-   SCORE SPORTIF
+   SCORE SPORTIF — MODELE ADAPTE AUX DONNEES MPGSTATS
 ========================================================= */
+
+function noteJourneePourScore(value){
+
+  if(value === null || value === undefined || value === "") return null;
+
+  const m = String(value).replace(",", ".").match(/-?\d+(?:\.\d+)?/);
+
+  if(!m) return null;
+
+  const n = Number(m[0]);
+
+  return Number.isFinite(n) ? n : null;
+
+}
+
+function calculerIndicateursJournees(raw){
+
+  const noms = [
+    "D3","D2","D1",
+    ...Array.from({length:31}, (_,i) => `D-${i+4}`)
+  ];
+
+  const notes = noms
+    .map(nom => noteJourneePourScore(raw?.[nom]))
+    .filter(v => v !== null && v > 0);
+
+  if(!notes.length){
+    return {formeRecente:null, regulariteCalculee:null};
+  }
+
+  // Les 5 dernières notes disponibles donnent la forme récente.
+  const recentes = notes.slice(0,5);
+  const moyenne = recentes.reduce((a,b) => a+b,0) / recentes.length;
+
+  // Régularité : 10 = notes très stables, plus faible si elles varient beaucoup.
+  const variance = recentes.reduce((s,v) => s + Math.pow(v-moyenne,2),0) / recentes.length;
+  const ecartType = Math.sqrt(variance);
+  const regularite = Math.max(0, Math.min(10, 10 - ecartType * 2));
+
+  return {
+    formeRecente: moyenne,
+    regulariteCalculee: regularite
+  };
+}
+
+function enrichirIndicateursDepuisSource(j, raw){
+
+  const indicateurs = calculerIndicateursJournees(raw);
+
+  j.formeRecente = indicateurs.formeRecente;
+  j.regulariteCalculee = indicateurs.regulariteCalculee;
+
+  // %Titu est utilisé comme proxy de temps de jeu (0 à 100).
+  if(j.temps === null && j.pourcentageTitulaire !== null){
+    j.temps = j.pourcentageTitulaire;
+  }
+
+  // Si la régularité brute n'existe pas, on utilise celle calculée à partir
+  // des notes de journées MPG disponibles dans le fichier.
+  if(j.regularite === null){
+    j.regularite = j.regulariteCalculee;
+  }
+}
 
 function score(j){
 
   const champs = [
-
     j.note,
     j.temps,
     j.buts,
-    j.passes,
+    j.formeRecente,
     j.regularite
-
   ];
 
-
-  if(
-    champs.some(
-      v => v === null
-    )
-  ){
-
+  if(champs.some(v => v === null)){
     return null;
-
   }
 
+  /*
+    Pondération adaptée aux colonnes réellement présentes :
+      note MPG       : 8 pts par point de note
+      % titulaire    : 0,10 pt par %
+      buts           : 0,80 pt par but
+      forme récente  : 1,00 pt par point
+      régularité     : 0,20 pt par point
 
+    Ce modèle conserve une échelle proche de l'ancien score (0-100)
+    sans inventer des passes ou un temps de jeu absent du fichier.
+  */
   return (
-
     j.note * 8 +
-    j.temps * 0.20 +
-    j.buts * 0.20 +
-    j.passes * 0.12 +
-    j.regularite * 0.15
-
+    j.temps * 0.10 +
+    j.buts * 0.80 +
+    j.formeRecente * 1.00 +
+    j.regularite * 0.20
   );
-
 }
-
 
 /* =========================================================
    VALEUR THEORIQUE — MODELE V1
