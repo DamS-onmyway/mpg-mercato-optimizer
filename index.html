@@ -374,6 +374,14 @@ code{
 <div id="resultats"></div>
 
 <div class="card">
+    <h2>🧠 Historique des 10 managers</h2>
+    <p class="club">
+        Analyse des achats historiques connus. Les prix ci-dessous sont les enchères réellement payées lors du mercato précédent ; ils restent séparés de la cote MPG actuelle.
+    </p>
+    <div id="historiqueManagers"></div>
+</div>
+
+<div class="card">
     <h2>💡 Comment fonctionne l'outil ?</h2>
 
     <p>
@@ -1260,6 +1268,57 @@ function afficherJoueurs(){
     });
 }
 
+function afficherHistoriqueManagers(){
+
+    const zone = document.getElementById("historiqueManagers");
+    if(!zone) return;
+
+    const managers = ligue.managersData.map(m => m.nom);
+
+    const lignes = managers.map(nomManager => {
+        const achats = historiqueMercato.filter(x =>
+            x.manager === nomManager && x.prixAchat != null
+        );
+
+        const total = achats.reduce((s,x) => s + Number(x.prixAchat), 0);
+        const moyenne = achats.length ? total / achats.length : 0;
+        const max = achats.length ? Math.max(...achats.map(x => Number(x.prixAchat))) : 0;
+        const min = achats.length ? Math.min(...achats.map(x => Number(x.prixAchat))) : 0;
+
+        const postes = {G:0,D:0,M:0,A:0};
+        achats.forEach(x => { if(postes[x.poste] !== undefined) postes[x.poste]++; });
+
+        const profil = achats.length === 0
+            ? "Aucune donnée historique disponible"
+            : `Moy. ${moyenne.toFixed(1)} M€ • Min ${min} M€ • Max ${max} M€`;
+
+        return `
+            <div class="player">
+                <div class="player-top">
+                    <div>
+                        <div class="player-name">${nomManager}</div>
+                        <div class="club">${achats.length} achat(s) connu(s) • ${profil}</div>
+                    </div>
+                    <div class="badge A">${total} M€</div>
+                </div>
+                <div class="stats">
+                    <div class="stat"><small>Total dépensé</small><strong>${total} M€</strong></div>
+                    <div class="stat"><small>Achat moyen</small><strong>${achats.length ? moyenne.toFixed(1) : "—"} M€</strong></div>
+                    <div class="stat"><small>Répartition</small><strong>G ${postes.G} • D ${postes.D} • M ${postes.M} • A ${postes.A}</strong></div>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    const connus = historiqueMercato.filter(x => x.prixAchat != null).length;
+    const inconnus = historiqueMercato.filter(x => x.prixAchat == null).length;
+
+    zone.innerHTML = `
+        <div class="bid">📊 <b>${connus}</b> prix historiques connus sur <b>${historiqueMercato.length}</b> joueurs${inconnus ? ` • ${inconnus} prix inconnu(s)` : ""}.</div>
+        ${lignes}
+    `;
+}
+
 function analyser(){
 
     const budget =
@@ -1313,6 +1372,7 @@ function mettreAJourEtatLigue(){
 
 mettreAJourEtatLigue();
 afficherJoueurs();
+afficherHistoriqueManagers();
 
 </script>
 
