@@ -324,6 +324,9 @@ footer{
 
 </head>
 
+<!-- Lecture des exports XLSX de MPG Stats -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <body>
 
 <div class="container">
@@ -436,10 +439,11 @@ footer{
 
     <br><br>
 
-    <strong>Fusion des doublons :</strong>
-    lorsqu'un ID MPG est disponible, il est utilisé comme identifiant.
-    Sinon, la fusion se fait sur <strong>Nom + poste</strong>.
-    Un changement de club ne crée donc plus automatiquement un doublon.
+    <strong>Identification renforcée :</strong>
+    l'application utilise d'abord l'ID MPG lorsqu'il existe, puis
+    <strong>Nom + poste</strong>, avec une sécurité supplémentaire pour
+    les exports MPG Stats qui utilisent parfois uniquement le nom de famille.
+    Les homonymes ambigus ne sont jamais fusionnés arbitrairement.
 
   </div>
 
@@ -450,7 +454,7 @@ footer{
   <input
     id="fichierCatalogue"
     type="file"
-    accept=".csv,.tsv,.txt,.json"
+    accept=".csv,.tsv,.txt,.json,.xlsx,.xls"
   >
 
   <br>
@@ -558,7 +562,7 @@ footer{
 
 <footer>
 
-  MPG Mercato Optimizer — V5 catalogue 2026/27
+  MPG Mercato Optimizer — V6 import catalogue 2026/27
   • Modèle de valorisation V1
   • Cote historique février 2026 intégrée
 
@@ -935,6 +939,40 @@ const cataloguePublic = [
 
 let joueurs = [];
 
+/*
+  Alias des 24 joueurs déjà possédés par Gens Bon.
+  MPG Stats peut exporter "Samba" au lieu de "Brice Samba".
+  Pour les homonymes, le poste et, si nécessaire, le club servent
+  uniquement à lever l'ambiguïté.
+*/
+const ALIASES_GENS_BON = [
+  {full:"Brice Samba", nom:"Samba", poste:"G", clubs:["Rennes"]},
+  {full:"Illia Zabarnyi", nom:"Zabarnyi", poste:"D", clubs:["Paris"]},
+  {full:"Gautier Lloris", nom:"Lloris", poste:"D", clubs:["Brest"]},
+  {full:"Willian Pacho", nom:"Pacho", poste:"D", clubs:["Paris"]},
+  {full:"Alexsandro Ribeiro", nom:"Alexsandro Ribeiro", poste:"D", clubs:["Lille"]},
+  {full:"Matthieu Udol", nom:"Udol", poste:"D", clubs:["Lens"]},
+  {full:"Moussa Niakhaté", nom:"Niakhaté", poste:"D", clubs:["Lyon"]},
+  {full:"Alidu Seidu", nom:"Seidu", poste:"D", clubs:["Rennes"]},
+  {full:"Ruben Kluivert", nom:"Kluivert", poste:"D", clubs:["Lyon"]},
+  {full:"Telli Siwe", nom:"Siwe", poste:"D", clubs:["Auxerre"]},
+  {full:"Denis Zakaria", nom:"Zakaria", poste:"M", clubs:["Monaco"]},
+  {full:"Moses Simon", nom:"Simon", poste:"M", clubs:["Paris FC"]},
+  {full:"Aron Dønnum", nom:"Dønnum", poste:"M", clubs:["Toulouse"]},
+  {full:"Benjamin André", nom:"André", poste:"M", clubs:["Lille"]},
+  {full:"Pape Diop", nom:"Diop", poste:"M", clubs:["Strasbourg","Toulouse"]},
+  {full:"Haris Belkebla", nom:"Belkebla", poste:"M", clubs:["Angers"]},
+  {full:"Lasso Coulibaly", nom:"Coulibaly", poste:"M", clubs:["Auxerre"]},
+  {full:"Odsonne Édouard", nom:"Édouard", poste:"A", clubs:["Lens"]},
+  {full:"Florian Sotoca", nom:"Sotoca", poste:"A", clubs:["Lens"]},
+  {full:"Lassine Sinayoko", nom:"Sinayoko", poste:"A", clubs:["Paris FC"]},
+  {full:"Breel Embolo", nom:"Embolo", poste:"A", clubs:[]},
+  {full:"Issa Soumaré", nom:"Soumaré", poste:"A", clubs:["Rennes"]},
+  {full:"Aiyegun Tosin", nom:"Aiyegun Tosin", poste:"A", clubs:["Lorient"]},
+  {full:"Josué Casimir", nom:"Casimir", poste:"A", clubs:["Auxerre"]}
+];
+
+let dernierRapportImport = null;
 
 /* =========================================================
    OUTILS GENERIQUES
@@ -1014,49 +1052,33 @@ function valeurTexte(value){
 
 
 function normaliserPoste(value){
-
   const s = normaliserTexte(value);
 
-  if([
-    "g",
-    "gardien",
-    "gardiens",
-    "goal",
-    "gb"
-  ].includes(s)){
+  if(["g","gardien","gardiens","goal","gb","gk"].includes(s)){
     return "G";
   }
 
   if([
-    "d",
-    "def",
-    "defenseur",
-    "defenseurs"
+    "d","def","defenseur","defenseurs",
+    "dc","dl","defenseurcentral","defenseurlateral"
   ].includes(s)){
     return "D";
   }
 
   if([
-    "m",
-    "milieu",
-    "milieux"
+    "m","milieu","milieux","md","mo",
+    "milieudefensif","milieuoffensif"
   ].includes(s)){
     return "M";
   }
 
-  if([
-    "a",
-    "att",
-    "attaquant",
-    "attaquants"
-  ].includes(s)){
+  if(["a","att","attaquant","attaquants"].includes(s)){
     return "A";
   }
 
   return String(value ?? "")
     .trim()
     .toUpperCase();
-
 }
 
 
@@ -1199,6 +1221,15 @@ function normaliserJoueur(raw){
       )
     ),
 
+    pourcentageTitulaire: nombre(
+      get(
+        "pourcentagetitulaire",
+        "%titu",
+        "titu",
+        "pcttitu"
+      )
+    ),
+
     nouveau: bool(
       get(
         "nouveau",
@@ -1210,7 +1241,9 @@ function normaliserJoueur(raw){
       get(
         "blesse",
         "Blessé",
-        "blesseActuellement"
+        "blesseActuellement",
+        "indispo",
+        "indispo ?"
       )
     ),
 
@@ -1246,7 +1279,9 @@ function normaliserJoueur(raw){
       get(
         "statutDispo",
         "StatutDispo",
-        "disponibilite"
+        "disponibilite",
+        "indispo",
+        "indispo ?"
       )
     ),
 
@@ -1276,6 +1311,18 @@ function normaliserJoueur(raw){
 
   if(!joueur.nom){
     return null;
+  }
+
+  if(
+    !joueur.statutTitulaire &&
+    joueur.pourcentageTitulaire !== null
+  ){
+    joueur.statutTitulaire =
+      joueur.pourcentageTitulaire >= 100
+        ? "TITULAIRE"
+        : joueur.pourcentageTitulaire > 0
+          ? "ROTATION"
+          : "NON TITULAIRE";
   }
 
 
@@ -1314,20 +1361,97 @@ function joueurValide(j){
 ========================================================= */
 
 function cleJoueur(j){
-
   if(j.id){
-
     return "id|" +
       normaliserTexte(j.id);
-
   }
+
+  const alias = aliasGensBonPour(j);
+  const nomIdentite = alias
+    ? alias.full
+    : j.nom;
 
   return [
     "np",
-    normaliserTexte(j.nom),
+    normaliserTexte(nomIdentite),
     normaliserTexte(j.poste)
   ].join("|");
+}
 
+function aliasGensBonPour(j){
+  const nom = normaliserTexte(j.nom);
+  const poste = normaliserPoste(j.poste);
+
+  const candidats = ALIASES_GENS_BON.filter(alias => {
+    if(normaliserTexte(alias.nom) !== nom){
+      return false;
+    }
+
+    if(alias.poste !== poste){
+      return false;
+    }
+
+    if(!alias.clubs.length){
+      return true;
+    }
+
+    const club = normaliserTexte(j.club);
+
+    return alias.clubs.some(c =>
+      club.includes(normaliserTexte(c))
+    );
+  });
+
+  return candidats.length === 1
+    ? candidats[0]
+    : null;
+}
+
+function dernierNom(value){
+  const mots = normaliserTexte(value)
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return mots.length
+    ? mots[mots.length - 1]
+    : "";
+}
+
+function trouverCleCorrespondante(j,map){
+  const cleExacte = cleJoueur(j);
+
+  if(map.has(cleExacte)){
+    return cleExacte;
+  }
+
+  /*
+    Si l'un des deux fichiers utilise le nom complet et l'autre
+    uniquement le nom de famille, on tente une correspondance
+    uniquement lorsqu'elle est unique pour le même poste.
+  */
+  const nomCourt = dernierNom(j.nom);
+
+  if(!nomCourt){
+    return null;
+  }
+
+  const candidats = [];
+
+  for(const [key, fiche] of map.entries()){
+    if(
+      normaliserTexte(fiche.poste) === normaliserTexte(j.poste) &&
+      (
+        normaliserTexte(fiche.nom) === nomCourt ||
+        dernierNom(fiche.nom) === nomCourt
+      )
+    ){
+      candidats.push(key);
+    }
+  }
+
+  return candidats.length === 1
+    ? candidats[0]
+    : null;
 }
 
 
@@ -1364,6 +1488,7 @@ function fusionnerFiches(ancien,nouveau){
     "buts",
     "passes",
     "regularite",
+    "pourcentageTitulaire",
     "nouveau",
     "blesse",
     "dateMajBlessure",
@@ -1427,88 +1552,49 @@ function fusionnerCatalogue(
   existant,
   nouveaux
 ){
-
   const map = new Map();
 
+  const ajouter = raw => {
+    const j = normaliserJoueur(raw);
+
+    if(!joueurValide(j)){
+      return;
+    }
+
+    const key =
+      trouverCleCorrespondante(
+        j,
+        map
+      );
+
+    if(key && map.has(key)){
+      map.set(
+        key,
+        fusionnerFiches(
+          map.get(key),
+          j
+        )
+      );
+    }
+    else{
+      map.set(
+        cleJoueur(j),
+        j
+      );
+    }
+  };
 
   for(const raw of existant){
-
-    const j =
-      normaliserJoueur(raw);
-
-    if(!joueurValide(j)){
-      continue;
-    }
-
-
-    const key =
-      cleJoueur(j);
-
-
-    if(map.has(key)){
-
-      map.set(
-        key,
-        fusionnerFiches(
-          map.get(key),
-          j
-        )
-      );
-
-    }
-    else{
-
-      map.set(
-        key,
-        j
-      );
-
-    }
-
+    ajouter(raw);
   }
-
 
   for(const raw of nouveaux){
-
-    const j =
-      normaliserJoueur(raw);
-
-    if(!joueurValide(j)){
-      continue;
-    }
-
-
-    const key =
-      cleJoueur(j);
-
-
-    if(map.has(key)){
-
-      map.set(
-        key,
-        fusionnerFiches(
-          map.get(key),
-          j
-        )
-      );
-
-    }
-    else{
-
-      map.set(
-        key,
-        j
-      );
-
-    }
-
+    ajouter(raw);
   }
-
 
   return Array.from(
     map.values()
   );
-
 }
 
 
@@ -1610,27 +1696,29 @@ function joueurCatalogue(nom){
 
 
 function joueurEstAttribue(joueur){
+  const alias =
+    aliasGensBonPour(joueur);
 
-  const key =
-    cleNomJoueur(
-      joueur.nom
-    );
-
+  const cleImport =
+    cleNomJoueur(joueur.nom);
 
   return ligue.managersData.some(
     manager =>
+      Array.isArray(manager.joueurs) &&
+      manager.joueurs.some(nom => {
+        const cleRoster =
+          cleNomJoueur(nom);
 
-      Array.isArray(
-        manager.joueurs
-      ) &&
+        if(cleRoster === cleImport){
+          return true;
+        }
 
-      manager.joueurs.some(
-        nom =>
-          cleNomJoueur(nom) === key
-      )
-
+        return !!(
+          alias &&
+          cleNomJoueur(alias.full) === cleRoster
+        );
+      })
   );
-
 }
 
 
@@ -3486,37 +3574,75 @@ function parserDonnees(text){
    IMPORTER CATALOGUE
 ========================================================= */
 
-function importerCatalogue(){
+async function importerCatalogue(){
+  const fichier =
+    document.getElementById(
+      "fichierCatalogue"
+    ).files?.[0];
 
   const texte =
     document.getElementById(
       "texteCatalogue"
     ).value.trim();
 
-
-  if(!texte){
-
+  if(!fichier && !texte){
     alert(
-      "Colle d'abord un catalogue CSV/TSV/JSON ou lis un fichier."
+      "Sélectionne un fichier ou colle un catalogue CSV/TSV/JSON."
     );
-
     return;
-
   }
 
-
-  let donnees;
-
+  let donnees = [];
 
   try{
+    if(
+      fichier &&
+      /\\.(xlsx|xls)$/i.test(fichier.name)
+    ){
+      if(typeof XLSX === "undefined"){
+        throw new Error(
+          "Le module XLSX n'est pas chargé. Vérifie la connexion internet puis recharge la page."
+        );
+      }
 
-    donnees =
-      parserDonnees(
-        texte
-      );
+      const buffer =
+        await fichier.arrayBuffer();
 
+      const workbook =
+        XLSX.read(
+          buffer,
+          {type:"array"}
+        );
+
+      const premiereFeuille =
+        workbook.Sheets[
+          workbook.SheetNames[0]
+        ];
+
+      donnees =
+        XLSX.utils.sheet_to_json(
+          premiereFeuille,
+          {defval:""}
+        );
+    }
+    else if(fichier){
+      const contenu =
+        await fichier.text();
+
+      donnees =
+        parserDonnees(
+          contenu
+        );
+    }
+    else{
+      donnees =
+        parserDonnees(
+          texte
+        );
+    }
   }
   catch(e){
+    console.error(e);
 
     alert(
       "Impossible de lire les données : " +
@@ -3524,100 +3650,94 @@ function importerCatalogue(){
     );
 
     return;
-
   }
-
 
   const normalises =
     donnees
-      .map(
-        normaliserJoueur
-      )
-      .filter(
-        joueurValide
-      );
+      .map(normaliserJoueur)
+      .filter(joueurValide);
 
-
-  if(
-    !normalises.length
-  ){
-
+  if(!normalises.length){
     alert(
       "Aucun joueur valide n'a été trouvé."
     );
-
     return;
-
   }
-
 
   const mode =
     document.getElementById(
       "modeImport"
     ).value;
 
-
   const ancienNombre =
     joueurs.length;
 
-
-  if(
-    mode === "replace"
-  ){
-
+  if(mode === "replace"){
     joueurs =
       fusionnerCatalogue(
         [],
         normalises
       );
-
   }
-
   else{
-
     joueurs =
       fusionnerCatalogue(
         joueurs,
         normalises
       );
-
   }
-
 
   const nouveauNombre =
     joueurs.length;
 
+  const doublonsFusionnes =
+    Math.max(
+      0,
+      ancienNombre +
+      normalises.length -
+      nouveauNombre
+    );
+
+  const aliasesDetectes =
+    ALIASES_GENS_BON.filter(alias =>
+      joueurs.some(j =>
+        aliasGensBonPour(j)?.full === alias.full
+      )
+    );
+
+  const aliasesAbsents =
+    ALIASES_GENS_BON.filter(alias =>
+      !aliasesDetectes.some(
+        x => x.full === alias.full
+      )
+    );
+
+  dernierRapportImport = {
+    lignes: donnees.length,
+    fichesValides: normalises.length,
+    catalogueTotal: joueurs.length,
+    doublonsFusionnes,
+    joueursGensBonDetectes:
+      aliasesDetectes.length,
+    joueursGensBonAbsents:
+      aliasesAbsents.length,
+    joueursGensBonAbsentsListe:
+      aliasesAbsents.map(x => x.full)
+  };
 
   sauvegarderCatalogue();
-
-
   mettreAJourEtatLigue();
-
   afficherEtatCatalogue();
-
   afficherJoueurs();
 
-
-  const difference =
-    ancienNombre +
-    normalises.length -
-    nouveauNombre;
-
-
   alert(
-
-    `${normalises.length} ligne(s) importée(s). ` +
-
-    `Catalogue actif : ${joueurs.length} joueur(s).` +
-
-    (
-      difference > 0
-        ? ` ${difference} doublon(s) fusionné(s).`
-        : ""
-    )
-
+    "Import terminé.\\n\\n" +
+    `${donnees.length} ligne(s) lue(s)\\n` +
+    `${normalises.length} joueur(s) valide(s)\\n` +
+    `${joueurs.length} fiche(s) dans le catalogue\\n` +
+    `${doublonsFusionnes} doublon(s) fusionné(s)\\n` +
+    `${aliasesDetectes.length}/24 joueur(s) de Gens Bon identifiés`
   );
-
 }
 
 
@@ -3625,65 +3745,61 @@ function importerCatalogue(){
    LIRE FICHIER
 ========================================================= */
 
-function lireFichier(){
-
+async function lireFichier(){
   const input =
     document.getElementById(
       "fichierCatalogue"
     );
 
-
   const fichier =
     input.files?.[0];
 
-
   if(!fichier){
-
     alert(
       "Sélectionne d'abord un fichier."
     );
-
     return;
-
   }
 
+  if(/\\.(xlsx|xls)$/i.test(fichier.name)){
+    document.getElementById(
+      "texteCatalogue"
+    ).value = "";
+
+    alert(
+      "Fichier Excel détecté. Clique maintenant sur « Importer » : le fichier XLSX sera lu directement."
+    );
+
+    return;
+  }
 
   const reader =
     new FileReader();
 
-
   reader.onload =
     function(){
-
       document.getElementById(
         "texteCatalogue"
       ).value =
         reader.result;
 
-
       alert(
         "Fichier chargé dans la zone de texte. " +
         "Clique maintenant sur « Importer »."
       );
-
     };
-
 
   reader.onerror =
     function(){
-
       alert(
         "Impossible de lire le fichier."
       );
-
     };
-
 
   reader.readAsText(
     fichier,
     "UTF-8"
   );
-
 }
 
 
@@ -3976,6 +4092,26 @@ function afficherEtatCatalogue(){
     avec les statistiques nécessaires
     au calcul complet de la valeur théorique.
 
+    ${
+      dernierRapportImport
+        ? `
+          <br><br>
+          <strong>Dernier import :</strong>
+          ${dernierRapportImport.lignes} ligne(s) lue(s),
+          ${dernierRapportImport.doublonsFusionnes} doublon(s) fusionné(s),
+          ${dernierRapportImport.joueursGensBonDetectes}/24 joueur(s)
+          de Gens Bon identifiés.
+          ${
+            dernierRapportImport.joueursGensBonAbsents
+              ? `<br><span class="warn">
+                  ${dernierRapportImport.joueursGensBonAbsents} joueur(s)
+                  de Gens Bon non retrouvé(s) dans le fichier.
+                </span>`
+              : ""
+          }
+        `
+        : ""
+    }
   `;
 
 }
