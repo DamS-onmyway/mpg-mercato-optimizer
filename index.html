@@ -228,6 +228,7 @@ code{
 .injury-status.injured{background:rgba(255,93,108,.18);color:#ff8b96}
 .injury-status.recovering{background:rgba(255,184,77,.18);color:#ffc96f}
 .injury-status.doubtful{background:rgba(93,169,255,.18);color:#8cc4ff}
+.injury-status.uncertain{background:rgba(80,80,90,.45);color:#e4e4ea}
 .injury-status.ok{background:rgba(55,214,122,.15);color:#72e79e}
 .injury-panel{border:1px solid #273252;border-radius:14px;padding:14px;margin-top:12px;background:#11182c}
 .injury-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -390,7 +391,7 @@ code{
     <p class="club">Les données physiques sont stockées séparément du catalogue MPG et de l’historique. Elles peuvent donc être mises à jour sans modifier tes données importées.</p>
     <div class="injury-grid">
         <div><label>Joueur</label><input id="blessureNom" type="text" placeholder="Ex. Brice Samba"></div>
-        <div><label>Statut</label><select id="blessureStatut"><option value="available">🟢 Disponible / forme normale</option><option value="recent_return">🟡 Retour récent</option><option value="close_return">🟠 Retour proche</option><option value="long_injury">🔴 Blessure longue</option><option value="uncertain">⚫ Retour très incertain</option></select></div>
+        <div><label>Statut</label><select id="blessureStatut"><option value="available">🟢 Disponible</option><option value="injured">🔴 Blessé</option><option value="recovering">🟠 Reprise / retour récent</option><option value="doubtful">🟡 Retour très incertain</option><option value="uncertain">⚫ Retour très incertain</option></select></div>
         <div><label>Type / motif</label><input id="blessureType" type="text" placeholder="Ex. ischio, genou, maladie..."></div>
         <div><label>Retour estimé</label><input id="blessureRetour" type="date"></div>
         <div><label>Retour en forme estimé</label><input id="blessureForme" type="date"></div>
@@ -401,7 +402,7 @@ code{
         <button class="secondary" type="button" onclick="supprimerBlessure()">🗑️ Supprimer la fiche</button>
         <button class="secondary" type="button" onclick="afficherBlessures()">🔄 Actualiser la liste</button>
     </div>
-    <p class="injury-note">La décote agit uniquement sur le <b>prix attendu et l’enchère</b> : la <b>valeur sportive</b> reste inchangée. Les 5 états sont 🟢 disponible, 🟡 retour récent, 🟠 retour proche, 🔴 blessure longue et ⚫ retour très incertain.</p>
+    <p class="injury-note">Les 5 états physiques sont : 🟢 disponible, 🟡 retour récent, 🟠 retour proche, 🔴 blessure longue, ⚫ retour très incertain. La décote agit sur le <b>prix attendu et l’enchère</b>, jamais sur la valeur sportive de base. Une date de retour reste une estimation et le niveau de risque peut renforcer la décote.</p>
     <div id="listeBlessures" style="margin-top:14px"></div>
 </div>
 
@@ -1011,83 +1012,46 @@ function joursEntre(a,b){
     return Math.ceil((d2-d1)/86400000);
 }
 
-function calculerStatutPhysique(f){
-    // Moteur V2 : cinq états physiques. Les dates permettent d'affiner
-    // le statut, tandis que la saisie manuelle reste possible.
-    const aujourd = new Date();
-    aujourd.setHours(12,0,0,0);
-    const date = valeur => {
-        if(!valeur) return null;
-        const d = new Date(valeur + "T12:00:00");
-        return Number.isNaN(d.getTime()) ? null : d;
-    };
-    const retour = date(f.retour);
-    const forme = date(f.forme);
-    const joursAvantRetour = retour ? Math.ceil((retour - aujourd) / 86400000) : null;
-    const joursAvantForme = forme ? Math.ceil((forme - aujourd) / 86400000) : null;
+function statutPhysique(j){
+    const f=blessures[cleBlessure(j.nom)];
+    if(!f) return {statut:"available", facteur:1, label:"🟢 Disponible / forme normale", detail:"Aucune fiche physique"};
 
-    let statut = f.statut || "available";
-    // Compatibilité avec les anciennes fiches.
-    if(statut === "injured") {
-        if(f.risque === "high" && joursAvantRetour === null) statut = "uncertain";
-        else if(joursAvantRetour !== null && joursAvantRetour >= 0 && joursAvantRetour <= 14) statut = "close_return";
-        else if(joursAvantRetour !== null && joursAvantRetour > 14) statut = "long_injury";
-        else statut = "uncertain";
-    } else if(statut === "recovering") {
-        statut = "recent_return";
-    } else if(statut === "doubtful") {
-        statut = "uncertain";
-    }
-
-    const labels = {
-        available: "🟢 Disponible / forme normale",
-        recent_return: "🟡 Retour récent",
-        close_return: "🟠 Retour proche",
-        long_injury: "🔴 Blessure longue",
-        uncertain: "⚫ Retour très incertain"
-    };
+    const aujourd=new Date().toISOString().slice(0,10);
+    let statut=f.statut || "available";
+    let facteur=1;
 
     if(statut === "available") {
-        return {statut, facteur:1, label:labels.available, detail:"Aucune décote physique", fiche:f};
-    }
-
-    let facteur = 1;
-    let detail = "";
-    if(statut === "recent_return") {
-        if(joursAvantForme !== null && joursAvantForme > 0) {
-            facteur = joursAvantForme <= 7 ? 0.94 : joursAvantForme <= 14 ? 0.90 : 0.86;
-            detail = `Forme estimée dans ${joursAvantForme} j`;
-        } else {
-            facteur = 0.90;
-            detail = "Retour récent, rythme encore à confirmer";
-        }
-    } else if(statut === "close_return") {
-        facteur = joursAvantRetour !== null && joursAvantRetour <= 7 ? 0.90 : 0.86;
-        detail = joursAvantRetour !== null ? `Retour estimé dans ${Math.max(0,joursAvantRetour)} j` : "Retour proche";
-    } else if(statut === "long_injury") {
-        if(joursAvantRetour !== null && joursAvantRetour > 56) facteur = 0.52;
-        else if(joursAvantRetour !== null && joursAvantRetour > 28) facteur = 0.62;
-        else facteur = 0.70;
-        detail = joursAvantRetour !== null ? `Retour estimé dans ${joursAvantRetour} j` : "Absence longue";
+        facteur=1;
+    } else if(statut === "recovering") {
+        const joursForme=f.forme ? joursEntre(aujourd,f.forme) : null;
+        facteur = joursForme === null ? 0.92 : (joursForme <= 0 ? 0.96 : joursForme <= 14 ? 0.90 : 0.84);
+    } else if(statut === "injured") {
+        const jours=f.retour ? joursEntre(aujourd,f.retour) : null;
+        if(jours === null) facteur=0.65;
+        else if(jours <= 14) facteur=0.90;
+        else if(jours <= 28) facteur=0.80;
+        else if(jours <= 56) facteur=0.68;
+        else facteur=0.55;
+    } else if(statut === "doubtful") {
+        facteur=0.82;
     } else if(statut === "uncertain") {
-        facteur = 0.58;
-        detail = "Retour très incertain";
+        facteur=0.58;
     }
 
-    if(f.risque === "medium") facteur *= 0.97;
-    if(f.risque === "high") facteur *= 0.92;
-    facteur = Math.max(0.45, Math.min(1, facteur));
+    if(f.risque === "medium") facteur *= 0.96;
+    if(f.risque === "high") facteur *= 0.90;
+    facteur=Math.max(0.45,Math.min(1,facteur));
 
-    const retourTexte = retour ? retour.toLocaleDateString("fr-FR") : "non défini";
-    const formeTexte = forme ? forme.toLocaleDateString("fr-FR") : null;
-    const dates = `Retour : ${retourTexte}${formeTexte ? ` • Forme estimée : ${formeTexte}` : ""}`;
-    return {statut, facteur, label:labels[statut], detail:`${dates} • ${detail}`, fiche:f};
-}
-
-function statutPhysique(j){
-    const f = blessures[cleBlessure(j.nom)];
-    if(!f) return {statut:"available", facteur:1, label:"🟢 Disponible / forme normale", detail:"Aucune fiche physique", fiche:null};
-    return calculerStatutPhysique(f);
+    const retour=f.retour ? new Date(f.retour+"T12:00:00").toLocaleDateString("fr-FR") : "non défini";
+    const forme=f.forme ? new Date(f.forme+"T12:00:00").toLocaleDateString("fr-FR") : null;
+    const labels={
+        injured:"🔴 Blessure longue",
+        recovering:"🟡 Retour récent",
+        doubtful:"🟠 Retour proche",
+        uncertain:"⚫ Retour très incertain",
+        available:"🟢 Disponible / forme normale"
+    };
+    return {statut,facteur,label:labels[statut]||labels.available,detail:`Retour : ${retour}${forme ? ` • Forme estimée : ${forme}` : ""}`,fiche:f};
 }
 
 function enregistrerBlessure(){
@@ -1129,7 +1093,7 @@ function afficherBlessures(){
     if(!vals.length){ zone.innerHTML='<div class="bid">Aucune fiche physique enregistrée. Les joueurs sans fiche restent neutres.</div>'; return; }
     zone.innerHTML=vals.map(f=>{
         const j=joueurCatalogue(f.nom); const info=statutPhysique(j||{nom:f.nom});
-        return `<div class="player"><div class="player-top"><div><div class="player-name">${f.nom} <span class="injury-status ${f.statut}">${info.label}</span></div><div class="club">${f.type||"État physique suivi"} • MAJ ${f.maj||"—"}</div></div><div class="badge ${info.facteur>=.95?"A":info.facteur>=.80?"B":"C"}">x${info.facteur.toFixed(2)}</div></div><div class="bid">${info.detail}${f.risque?` • Risque : <b>${f.risque}</b>`:""}<br><span class="injury-impact">Impact enchère : ${(1-info.facteur)*100 > 0 ? `-${((1-info.facteur)*100).toFixed(0)} % environ` : "aucune décote"}</span><br><button class="secondary" type="button" onclick='chargerBlessureDansFormulaire(${JSON.stringify(f.nom)})'>✏️ Modifier</button></div></div>`;
+        return `<div class="player"><div class="player-top"><div><div class="player-name">${f.nom} <span class="injury-status ${f.statut}">${info.label}</span></div><div class="club">${f.type||"État physique suivi"} • MAJ ${f.maj||"—"}</div></div><div class="badge ${info.facteur>=.9?"A":"B"}">x${info.facteur.toFixed(2)}</div></div><div class="bid">${info.detail}${f.risque?` • Risque : <b>${f.risque}</b>`:""}<br><span class="injury-impact">Impact enchère : ${(1-info.facteur)*100 > 0 ? `-${((1-info.facteur)*100).toFixed(0)} % environ` : "aucune décote"}</span><br><button class="secondary" type="button" onclick='chargerBlessureDansFormulaire(${JSON.stringify(f.nom)})'>✏️ Modifier</button></div></div>`;
     }).join("");
 }
 
