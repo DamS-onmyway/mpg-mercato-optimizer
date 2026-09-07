@@ -1088,11 +1088,11 @@ function afficherBlessures(){
 }
 
 const SOURCE_BLESSURES_PUBLIQUE = "https://www.foot-direct.com/france/ligue-1/blessures-et-suspensions";
-const SOURCE_PROXY_BLESSURES = "https://r.jina.ai/http://https://www.foot-direct.com/france/ligue-1/blessures-et-suspensions";
+const SOURCE_PROXY_BLESSURES = "https://r.jina.ai/http://www.foot-direct.com/france/ligue-1/blessures-et-suspensions";
 const MOTS_BLESSURE = [
     "blessure", "blessé", "blessée", "musculaire", "ischio", "adducteur", "genou", "cheville",
     "mollet", "cuisse", "épaule", "hanche", "ligament", "croisé", "pubalgie", "fracture",
-    "commotion", "maladie", "lésion", "tendon", "entorse", "dos", "pied", "aine"
+    "commotion", "maladie", "lésion", "tendon", "entorse", "dos", "pied", "aine", "coup"
 ];
 const MOTS_SUSPENSION = ["suspendu", "suspension", "carton rouge", "cartons jaunes", "discipline"];
 
@@ -1111,40 +1111,54 @@ function estPreuveBlessure(texte){
     return MOTS_BLESSURE.some(m=>t.includes(m));
 }
 
-function deduireStatutPublic(type, retour, texte){
+function extraireDateRetourPublic(texte){
+    const t=normaliserTextePublic(texte);
+    let m=t.match(/(?:jusqu['’]au|jusqu['’]au|retour(?: prévu| estimé)?(?: le| vers)?)[^0-9]{0,25}(\d{1,2})[\s\/-](\d{1,2})[\s\/-](\d{2,4})/i);
+    if(!m) m=t.match(/(\d{1,2})[\s\/-](\d{1,2})[\s\/-](\d{4})/);
+    if(!m) return "";
+    let y=Number(m[3]); if(y<100) y+=2000;
+    return `${y}-${String(Number(m[2])).padStart(2,"0")}-${String(Number(m[1])).padStart(2,"0")}`;
+}
+
+function deduireStatutPublic(retour, texte){
     const t=normaliserTextePublic(texte).toLowerCase();
-    if(!estPreuveBlessure(t)) return null;
-    const aujourd=new Date();
+    if(MOTS_SUSPENSION.some(m=>t.includes(m)) && !MOTS_BLESSURE.some(m=>t.includes(m))) return null;
     if(!retour) return "uncertain";
     const d=new Date(retour+"T12:00:00");
+    if(Number.isNaN(d.getTime())) return "uncertain";
+    const aujourd=new Date(); aujourd.setHours(12,0,0,0);
     const jours=Math.ceil((d-aujourd)/86400000);
-    if(jours <= 0) return "recovering";
+    if(jours < 0) return "recovering";
     if(jours <= 14) return "doubtful";
-    if(jours > 56) return "injured";
     return "injured";
 }
 
-function extraireDateRetourPublic(texte){
-    const t=normaliserTextePublic(texte);
-    const m=t.match(/(?:jusqu['’]au|retour(?: prévu| estimé)?(?: le| vers)?)[^0-9]{0,15}(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i);
-    if(!m) return "";
-    let y=Number(m[3]); if(y<100) y+=2000;
-    const mm=String(Number(m[2])).padStart(2,"0"), dd=String(Number(m[1])).padStart(2,"0");
-    return `${y}-${mm}-${dd}`;
+function slugFootDirect(nom){
+    return String(nom||"")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+        .replace(/œ/gi,"oe").replace(/æ/gi,"ae")
+        .replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
 }
 
 function extraireCandidatsPublic(texte){
     const lignes=normaliserTextePublic(texte).split("\n").map(x=>x.trim()).filter(Boolean);
     const result=[];
-    const indexNom=new Map(joueurs.map(j=>[cleNom(j.nom),j]));
     for(let i=0;i<lignes.length;i++){
-        const bloc=[lignes[i],lignes[i+1]||"",lignes[i+2]||""].join(" ");
-        for(const j of joueurs){
-            if(!j.nom || !bloc.toLowerCase().includes(String(j.nom).toLowerCase())) continue;
-            if(!estPreuveBlessure(bloc)) continue;
-            result.push({joueur:j,texte:bloc,retour:extraireDateRetourPublic(bloc)});
-            break;
+        const ligne=lignes[i];
+        if(!/jusqu['’]au/i.test(ligne)) continue;
+        const date=extraireDateRetourPublic(ligne);
+        const avant=ligne.split(/jusqu['’]au/i)[0].trim().replace(/^[•*\-]+\s*/,"");
+        const candidats=avant.split(/\s{2,}|\|/).map(x=>x.trim()).filter(Boolean);
+        let joueur=null;
+        for(const morceau of candidats.reverse()){
+            joueur=trouverJoueurCatalogueParNom(morceau);
+            if(joueur) break;
         }
+        if(!joueur){
+            const bloc=[lignes[i-1]||"",ligne,lignes[i+1]||""].join(" ");
+            joueur=joueurs.find(j=>j.nom && bloc.toLowerCase().includes(String(j.nom).toLowerCase()))||null;
+        }
+        if(joueur) result.push({joueur,retour:date,texte:ligne});
     }
     const uniques=new Map();
     result.forEach(x=>uniques.set(cleNom(x.joueur.nom),x));
@@ -1152,54 +1166,70 @@ function extraireCandidatsPublic(texte){
 }
 
 async function recupererSourceBlessures(url){
-    const r=await fetch(url,{cache:"no-store"});
+    const r=await fetch(url,{cache:"no-store",headers:{"Accept":"text/plain,text/html,*/*"}});
     if(!r.ok) throw new Error(`Source inaccessible (${r.status})`);
     return await r.text();
 }
 
+async function recupererFicheJoueurPublique(joueur){
+    const slug=slugFootDirect(joueur.nom);
+    const urls=[
+        `https://r.jina.ai/http://www.foot-direct.com/joueur/${slug}`,
+        `https://r.jina.ai/https://www.foot-direct.com/joueur/${slug}`
+    ];
+    for(const url of urls){
+        try{
+            const texte=await recupererSourceBlessures(url);
+            if(texte && (texte.toLowerCase().includes("blessure en cours") || texte.toLowerCase().includes("suspensions en cours") || estPreuveBlessure(texte))) return {texte,source:url};
+        }catch(e){}
+    }
+    return null;
+}
+
 async function synchroniserBlessuresPubliques(){
     const zone=document.getElementById("syncBlessuresMessage");
-    if(zone) zone.textContent="🌐 Synchronisation en cours…";
+    if(zone) zone.textContent="🌐 Récupération de la liste publique…";
     try{
-        let texte="";
-        let source=SOURCE_BLESSURES_PUBLIQUE;
-        try{
-            texte=await recupererSourceBlessures(SOURCE_BLESSURES_PUBLIQUE);
-        }catch(e){
-            source=SOURCE_PROXY_BLESSURES;
-            texte=await recupererSourceBlessures(SOURCE_PROXY_BLESSURES);
-        }
+        let texte="", source=SOURCE_BLESSURES_PUBLIQUE;
+        try{ texte=await recupererSourceBlessures(SOURCE_BLESSURES_PUBLIQUE); }
+        catch(e){ source=SOURCE_PROXY_BLESSURES; texte=await recupererSourceBlessures(SOURCE_PROXY_BLESSURES); }
 
         const candidats=extraireCandidatsPublic(texte);
-        let ajoutes=0;
+        let blessuresConfirmees=0, suspensionsIgnorees=0, inconnus=0;
         const dateMaj=new Date().toISOString().slice(0,10);
-        candidats.forEach(c=>{
-            const statut=deduireStatutPublic("",c.retour,c.texte);
-            if(!statut) return;
-            const cle=cleBlessure(c.joueur.nom);
-            const ancienne=blessures[cle];
-            blessures[cle]={
-                ...(ancienne||{}),
-                nom:c.joueur.nom,
-                statut,
-                type:(ancienne&&ancienne.type) || "Blessure détectée publiquement",
-                retour:c.retour || (ancienne&&ancienne.retour) || "",
-                forme:(ancienne&&ancienne.forme) || "",
-                risque:(ancienne&&ancienne.risque) || "medium",
-                maj:dateMaj,
-                source
-            };
-            ajoutes++;
-        });
 
-        sauvegarderBlessures();
-        afficherBlessures();
-        afficherJoueurs();
+        for(const c of candidats){
+            if(zone) zone.textContent=`🌐 Vérification des blessures… ${blessuresConfirmees}/${candidats.length}`;
+            const fiche=await recupererFicheJoueurPublique(c.joueur);
+            if(!fiche){ inconnus++; continue; }
+            const ft=fiche.texte;
+            const estSusp=MOTS_SUSPENSION.some(m=>ft.toLowerCase().includes(m)) && !ft.toLowerCase().includes("blessure en cours");
+            if(estSusp && !estPreuveBlessure(ft)){ suspensionsIgnorees++; continue; }
+            if(!estPreuveBlessure(ft) && !ft.toLowerCase().includes("blessure en cours")){ inconnus++; continue; }
+
+            const retour=extraireDateRetourPublic(ft) || c.retour || "";
+            const statut=deduireStatutPublic(retour,ft) || "uncertain";
+            const typeMatch=ft.match(/blessure en cours[\\s\\S]{0,180}?\n\s*([^\n]+?)\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+            const type=typeMatch ? typeMatch[1].trim() : "Blessure détectée publiquement";
+            const cle=cleBlessure(c.joueur.nom), ancienne=blessures[cle];
+            // Une fiche manuelle reste prioritaire : la synchro publique ne l'écrase pas.
+            if(ancienne && ancienne.source !== "public") continue;
+            blessures[cle]={
+                ...(ancienne||{}), nom:c.joueur.nom, statut, type,
+                retour:retour || (ancienne&&ancienne.retour) || "",
+                forme:statut==="recovering" ? "Retour récent" : (ancienne&&ancienne.forme)||"",
+                risque:statut==="uncertain" ? "high" : ((ancienne&&ancienne.risque)||"medium"),
+                maj:dateMaj, source:"public", sourceUrl:fiche.source
+            };
+            blessuresConfirmees++;
+        }
+
+        sauvegarderBlessures(); afficherBlessures(); afficherJoueurs();
         const stamp=new Date().toLocaleString("fr-FR");
-        if(zone) zone.innerHTML=`✅ ${ajoutes} fiche(s) physique(s) détectée(s). Synchronisé le ${stamp}. <a href="${SOURCE_BLESSURES_PUBLIQUE}" target="_blank" rel="noopener">Source</a>`;
+        if(zone) zone.innerHTML=`✅ ${candidats.length} candidat(s) analysé(s) • <b>${blessuresConfirmees}</b> blessure(s) confirmée(s) • ${suspensionsIgnorees} suspension(s) ignorée(s) • ${inconnus} joueur(s) non confirmé(s).<br>Synchronisé le ${stamp}. <a href="${SOURCE_BLESSURES_PUBLIQUE}" target="_blank" rel="noopener">Source Foot Direct</a>`;
     }catch(e){
         console.error(e);
-        if(zone) zone.textContent="⚠️ Synchronisation automatique impossible depuis le navigateur. Les fiches existantes restent inchangées. Tu peux continuer avec la saisie manuelle.";
+        if(zone) zone.textContent="⚠️ Synchronisation automatique impossible. Les fiches existantes restent inchangées.";
     }
 }
 
