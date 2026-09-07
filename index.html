@@ -391,7 +391,7 @@ code{
     <p class="club">Les données physiques sont stockées séparément du catalogue MPG et de l’historique. Elles peuvent donc être mises à jour sans modifier tes données importées.</p>
     <div class="injury-grid">
         <div><label>Joueur</label><input id="blessureNom" type="text" placeholder="Ex. Brice Samba"></div>
-        <div><label>Statut</label><select id="blessureStatut"><option value="available">🟢 Disponible</option><option value="injured">🔴 Blessé</option><option value="recovering">🟠 Reprise / retour récent</option><option value="doubtful">🟡 Retour très incertain</option><option value="uncertain">⚫ Retour très incertain</option></select></div>
+        <div><label>Statut</label><select id="blessureStatut"><option value="available">🟢 Disponible / forme normale</option><option value="recovering">🟡 Retour récent</option><option value="doubtful">🟠 Retour proche</option><option value="injured">🔴 Blessure longue</option><option value="uncertain">⚫ Retour très incertain</option></select></div>
         <div><label>Type / motif</label><input id="blessureType" type="text" placeholder="Ex. ischio, genou, maladie..."></div>
         <div><label>Retour estimé</label><input id="blessureRetour" type="date"></div>
         <div><label>Retour en forme estimé</label><input id="blessureForme" type="date"></div>
@@ -401,8 +401,10 @@ code{
         <button class="primary" type="button" onclick="enregistrerBlessure()">💾 Enregistrer / mettre à jour</button>
         <button class="secondary" type="button" onclick="supprimerBlessure()">🗑️ Supprimer la fiche</button>
         <button class="secondary" type="button" onclick="afficherBlessures()">🔄 Actualiser la liste</button>
+        <button class="primary" type="button" onclick="synchroniserBlessuresPubliques()">🌐 Synchroniser les blessures</button>
     </div>
-    <p class="injury-note">Les 5 états physiques sont : 🟢 disponible, 🟡 retour récent, 🟠 retour proche, 🔴 blessure longue, ⚫ retour très incertain. La décote agit sur le <b>prix attendu et l’enchère</b>, jamais sur la valeur sportive de base. Une date de retour reste une estimation et le niveau de risque peut renforcer la décote.</p>
+    <p class="injury-note">Les 5 états physiques sont : 🟢 disponible, 🟡 retour récent, 🟠 retour proche, 🔴 blessure longue, ⚫ retour très incertain. La décote agit sur le <b>prix attendu et l’enchère</b>, jamais sur la valeur sportive de base. La synchronisation publique est prudente : elle ne remplace pas les fiches manuelles sans preuve de blessure et ignore les suspensions.</p>
+    <div id="syncBlessuresMessage" class="import-status" style="margin-top:10px">🌐 Dernière synchronisation : aucune.</div>
     <div id="listeBlessures" style="margin-top:14px"></div>
 </div>
 
@@ -1016,27 +1018,15 @@ function statutPhysique(j){
     const f=blessures[cleBlessure(j.nom)];
     if(!f) return {statut:"available", facteur:1, label:"🟢 Disponible / forme normale", detail:"Aucune fiche physique"};
 
-    const aujourd=new Date().toISOString().slice(0,10);
     let statut=f.statut || "available";
     let facteur=1;
 
-    if(statut === "available") {
-        facteur=1;
-    } else if(statut === "recovering") {
-        const joursForme=f.forme ? joursEntre(aujourd,f.forme) : null;
-        facteur = joursForme === null ? 0.92 : (joursForme <= 0 ? 0.96 : joursForme <= 14 ? 0.90 : 0.84);
-    } else if(statut === "injured") {
-        const jours=f.retour ? joursEntre(aujourd,f.retour) : null;
-        if(jours === null) facteur=0.65;
-        else if(jours <= 14) facteur=0.90;
-        else if(jours <= 28) facteur=0.80;
-        else if(jours <= 56) facteur=0.68;
-        else facteur=0.55;
-    } else if(statut === "doubtful") {
-        facteur=0.82;
-    } else if(statut === "uncertain") {
-        facteur=0.58;
-    }
+    // 5 états définitifs. La valeur sportive n'est jamais modifiée ici.
+    if(statut === "available") facteur=1.00;
+    else if(statut === "recovering") facteur=0.92; // retour récent
+    else if(statut === "doubtful") facteur=0.82;   // retour proche
+    else if(statut === "injured") facteur=0.55;    // blessure longue
+    else if(statut === "uncertain") facteur=0.58;  // retour très incertain
 
     if(f.risque === "medium") facteur *= 0.96;
     if(f.risque === "high") facteur *= 0.90;
@@ -1097,6 +1087,122 @@ function afficherBlessures(){
     }).join("");
 }
 
+const SOURCE_BLESSURES_PUBLIQUE = "https://www.foot-direct.com/france/ligue-1/blessures-et-suspensions";
+const SOURCE_PROXY_BLESSURES = "https://r.jina.ai/http://https://www.foot-direct.com/france/ligue-1/blessures-et-suspensions";
+const MOTS_BLESSURE = [
+    "blessure", "blessé", "blessée", "musculaire", "ischio", "adducteur", "genou", "cheville",
+    "mollet", "cuisse", "épaule", "hanche", "ligament", "croisé", "pubalgie", "fracture",
+    "commotion", "maladie", "lésion", "tendon", "entorse", "dos", "pied", "aine"
+];
+const MOTS_SUSPENSION = ["suspendu", "suspension", "carton rouge", "cartons jaunes", "discipline"];
+
+function normaliserTextePublic(t){
+    return String(t||"").replace(/\u00a0/g," ").replace(/[ \t]+/g," ").replace(/\r/g,"");
+}
+
+function trouverJoueurCatalogueParNom(nom){
+    const cible=cleNom(nom);
+    return joueurs.find(j=>cleNom(j.nom)===cible) || null;
+}
+
+function estPreuveBlessure(texte){
+    const t=normaliserTextePublic(texte).toLowerCase();
+    if(MOTS_SUSPENSION.some(m=>t.includes(m))) return false;
+    return MOTS_BLESSURE.some(m=>t.includes(m));
+}
+
+function deduireStatutPublic(type, retour, texte){
+    const t=normaliserTextePublic(texte).toLowerCase();
+    if(!estPreuveBlessure(t)) return null;
+    const aujourd=new Date();
+    if(!retour) return "uncertain";
+    const d=new Date(retour+"T12:00:00");
+    const jours=Math.ceil((d-aujourd)/86400000);
+    if(jours <= 0) return "recovering";
+    if(jours <= 14) return "doubtful";
+    if(jours > 56) return "injured";
+    return "injured";
+}
+
+function extraireDateRetourPublic(texte){
+    const t=normaliserTextePublic(texte);
+    const m=t.match(/(?:jusqu['’]au|retour(?: prévu| estimé)?(?: le| vers)?)[^0-9]{0,15}(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i);
+    if(!m) return "";
+    let y=Number(m[3]); if(y<100) y+=2000;
+    const mm=String(Number(m[2])).padStart(2,"0"), dd=String(Number(m[1])).padStart(2,"0");
+    return `${y}-${mm}-${dd}`;
+}
+
+function extraireCandidatsPublic(texte){
+    const lignes=normaliserTextePublic(texte).split("\n").map(x=>x.trim()).filter(Boolean);
+    const result=[];
+    const indexNom=new Map(joueurs.map(j=>[cleNom(j.nom),j]));
+    for(let i=0;i<lignes.length;i++){
+        const bloc=[lignes[i],lignes[i+1]||"",lignes[i+2]||""].join(" ");
+        for(const j of joueurs){
+            if(!j.nom || !bloc.toLowerCase().includes(String(j.nom).toLowerCase())) continue;
+            if(!estPreuveBlessure(bloc)) continue;
+            result.push({joueur:j,texte:bloc,retour:extraireDateRetourPublic(bloc)});
+            break;
+        }
+    }
+    const uniques=new Map();
+    result.forEach(x=>uniques.set(cleNom(x.joueur.nom),x));
+    return [...uniques.values()];
+}
+
+async function recupererSourceBlessures(url){
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error(`Source inaccessible (${r.status})`);
+    return await r.text();
+}
+
+async function synchroniserBlessuresPubliques(){
+    const zone=document.getElementById("syncBlessuresMessage");
+    if(zone) zone.textContent="🌐 Synchronisation en cours…";
+    try{
+        let texte="";
+        let source=SOURCE_BLESSURES_PUBLIQUE;
+        try{
+            texte=await recupererSourceBlessures(SOURCE_BLESSURES_PUBLIQUE);
+        }catch(e){
+            source=SOURCE_PROXY_BLESSURES;
+            texte=await recupererSourceBlessures(SOURCE_PROXY_BLESSURES);
+        }
+
+        const candidats=extraireCandidatsPublic(texte);
+        let ajoutes=0;
+        const dateMaj=new Date().toISOString().slice(0,10);
+        candidats.forEach(c=>{
+            const statut=deduireStatutPublic("",c.retour,c.texte);
+            if(!statut) return;
+            const cle=cleBlessure(c.joueur.nom);
+            const ancienne=blessures[cle];
+            blessures[cle]={
+                ...(ancienne||{}),
+                nom:c.joueur.nom,
+                statut,
+                type:(ancienne&&ancienne.type) || "Blessure détectée publiquement",
+                retour:c.retour || (ancienne&&ancienne.retour) || "",
+                forme:(ancienne&&ancienne.forme) || "",
+                risque:(ancienne&&ancienne.risque) || "medium",
+                maj:dateMaj,
+                source
+            };
+            ajoutes++;
+        });
+
+        sauvegarderBlessures();
+        afficherBlessures();
+        afficherJoueurs();
+        const stamp=new Date().toLocaleString("fr-FR");
+        if(zone) zone.innerHTML=`✅ ${ajoutes} fiche(s) physique(s) détectée(s). Synchronisé le ${stamp}. <a href="${SOURCE_BLESSURES_PUBLIQUE}" target="_blank" rel="noopener">Source</a>`;
+    }catch(e){
+        console.error(e);
+        if(zone) zone.textContent="⚠️ Synchronisation automatique impossible depuis le navigateur. Les fiches existantes restent inchangées. Tu peux continuer avec la saisie manuelle.";
+    }
+}
+
 function facteurBlessure(j){ return statutPhysique(j).facteur; }
 
 function moyenneNotesJournees(j){
@@ -1141,11 +1247,6 @@ function score(j){
     const moyenne=moyenneNotesJournees(j);
     if(recent != null) s += recent * 1.8;
     else if(moyenne != null) s += moyenne * 1.2;
-
-    // Un joueur explicitement indisponible reçoit une pénalité modérée,
-    // sans annuler sa valeur sportive.
-    const indispo=String(j.indisponible ?? "").trim().toLowerCase();
-    if(["oui","yes","true","1","indisponible"].includes(indispo)) s *= 0.75;
 
     return s;
 }
