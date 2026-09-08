@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Installer Python
         uses: actions/setup-python@v5
@@ -31,5 +33,10 @@ jobs:
           git add data/blessures-public.json
           git diff --cached --quiet || git commit -m "Mise à jour automatique des blessures"
 
+      - name: Mettre à jour la branche avant publication
+        run: |
+          git fetch origin main
+          git rebase origin/main
+
       - name: Publier les données
-        run: git push
+        run: git push origin HEAD:main
