@@ -1201,12 +1201,155 @@ function extraireCandidatsPublic(texte){
         }
     }
 
-    const uniques=new Map();
-    result.forEach(x=>{
-        const k=cleNom(x.joueur.nom);
-        if(!uniques.has(k)) uniques.set(k,x);
+function extraireCandidatsPublic(texte){
+    const bruto = String(texte || "");
+    const normal = normaliserTextePublic(bruto);
+    const result = [];
+
+    // Le snapshot peut être du HTML, du texte brut ou du Markdown.
+    // On travaille uniquement sur le texte original pour éviter
+    // les décalages d'index provoqués par cleNom().
+    const texteRecherche = normal.replace(/\s+/g, " ");
+
+    // 1) Recherche directe joueur + "Jusqu'au" + date
+    for(const joueur of joueurs){
+        if(!joueur || !joueur.nom) continue;
+
+        const nom = String(joueur.nom).trim();
+        if(!nom) continue;
+
+        const variantes = [
+            nom,
+            nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        ];
+
+        let idx = -1;
+
+        for(const variante of variantes){
+            idx = texteRecherche.toLowerCase().indexOf(variante.toLowerCase());
+            if(idx >= 0) break;
+        }
+
+        if(idx < 0) continue;
+
+        const apres = texteRecherche.slice(idx, idx + 500);
+
+        if(!/jusqu['’]au/i.test(apres)) continue;
+
+        const retour = extraireDateRetourPublic(apres);
+
+        if(!retour) continue;
+
+        result.push({
+            joueur,
+            retour,
+            texte: apres.slice(0, 300)
+        });
+    }
+
+    // 2) Recherche par lignes lorsque le snapshot conserve les retours ligne
+    const lignes = normal.split("\n")
+        .map(x => x.trim())
+        .filter(Boolean);
+
+    for(let i = 0; i < lignes.length; i++){
+        const ligne = lignes[i];
+
+        if(!/jusqu['’]au/i.test(ligne)) continue;
+
+        const date = extraireDateRetourPublic(ligne);
+
+        if(!date) continue;
+
+        const contexte = [
+            lignes[i - 2] || "",
+            lignes[i - 1] || "",
+            ligne,
+            lignes[i + 1] || "",
+            lignes[i + 2] || ""
+        ].join(" ");
+
+        for(const joueur of joueurs){
+            if(!joueur || !joueur.nom) continue;
+
+            const nom = String(joueur.nom).trim();
+
+            const variantes = [
+                nom,
+                nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            ];
+
+            const contexteMin = contexte.toLowerCase();
+
+            const trouve = variantes.some(v =>
+                contexteMin.includes(v.toLowerCase())
+            );
+
+            if(!trouve) continue;
+
+            result.push({
+                joueur,
+                retour: date,
+                texte: contexte.slice(0, 300)
+            });
+
+            break;
+        }
+    }
+
+    // 3) Dernier fallback : couples "nom + Jusqu'au date"
+    const re = /([^|<>]{2,120}?)\s+jusqu['’]au\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi;
+
+    let m;
+
+    while((m = re.exec(normal))){
+        const fragment = m[1]
+            .trim()
+            .replace(/^[•*\-]+\s*/, "");
+
+        for(const joueur of joueurs){
+            if(!joueur || !joueur.nom) continue;
+
+            const nom = String(joueur.nom).trim();
+
+            const variantes = [
+                nom,
+                nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            ];
+
+            const fragmentMin = fragment.toLowerCase();
+
+            const trouve = variantes.some(v =>
+                fragmentMin.includes(v.toLowerCase())
+            );
+
+            if(!trouve) continue;
+
+            result.push({
+                joueur,
+                retour: extraireDateRetourPublic(m[0]),
+                texte: m[0]
+            });
+
+            break;
+        }
+    }
+
+    // Supprimer les doublons
+    const uniques = new Map();
+
+    result.forEach(x => {
+        if(!x || !x.joueur || !x.joueur.nom) return;
+
+        const k = cleNom(x.joueur.nom);
+
+        if(!uniques.has(k)){
+            uniques.set(k, x);
+        }
     });
+
     return [...uniques.values()];
+}
 }
 
 async function recupererSourceBlessures(url){
