@@ -1098,7 +1098,14 @@ const MOTS_BLESSURE = [
 const MOTS_SUSPENSION = ["suspendu", "suspension", "carton rouge", "cartons jaunes", "discipline"];
 
 function normaliserTextePublic(t){
-    return String(t||"").replace(/\u00a0/g," ").replace(/[ \t]+/g," ").replace(/\r/g,"");
+    return String(t||"")
+        .replace(/\u00a0/g," ")
+        // Foot Direct renvoie le snapshot HTML avec des apostrophes encodées
+        // (ex. « Jusqu&#039;au »). On les décode avant les regex de détection.
+        .replace(/&#039;|&#39;|&apos;/gi,"'")
+        .replace(/&amp;/gi,"&")
+        .replace(/[ \t]+/g," ")
+        .replace(/\r/g,"");
 }
 
 function trouverJoueurCatalogueParNom(nom){
@@ -1114,7 +1121,7 @@ function estPreuveBlessure(texte){
 
 function extraireDateRetourPublic(texte){
     const t=normaliserTextePublic(texte);
-    let m=t.match(/(?:jusqu['’]au|jusqu['’]au|retour(?: prévu| estimé)?(?: le| vers)?)[^0-9]{0,25}(\d{1,2})[\s\/-](\d{1,2})[\s\/-](\d{2,4})/i);
+    let m=t.match(/(?:jusqu['’]au|jusqu['’]au|jusqu&#039;au|jusqu&#39;au|retour(?: prévu| estimé)?(?: le| vers)?)[^0-9]{0,25}(\d{1,2})[\s\/-](\d{1,2})[\s\/-](\d{2,4})/i);
     if(!m) m=t.match(/(\d{1,2})[\s\/-](\d{1,2})[\s\/-](\d{4})/);
     if(!m) return "";
     let y=Number(m[3]); if(y<100) y+=2000;
@@ -1142,152 +1149,70 @@ function slugFootDirect(nom){
 }
 
 function extraireCandidatsPublic(texte){
-    const bruto = String(texte || "");
-    const normal = normaliserTextePublic(bruto);
-    const result = [];
+    // Foot Direct peut être récupéré sous plusieurs formes : HTML, texte brut ou Markdown
+    // (notamment via r.jina.ai). Il ne faut donc pas dépendre d'une structure de lignes précise.
+    const bruto=String(texte||"");
+    const normal=normaliserTextePublic(bruto);
+    const lignes=normal.split("\n").map(x=>x.trim()).filter(Boolean);
+    const result=[];
 
-    // Le snapshot peut être du HTML, du texte brut ou du Markdown.
-    // On travaille uniquement sur le texte original pour éviter
-    // les décalages d’index provoqués par cleNom().
-    const texteRecherche = normal.replace(/\s+/g, " ");
+    // 1) Méthode classique : une ligne contient « Joueur Jusqu'au JJ/MM/AAAA ».
+    for(let i=0;i<lignes.length;i++){
+        const ligne=lignes[i];
+        if(!/jusqu['’]au/i.test(ligne)) continue;
+        const date=extraireDateRetourPublic(ligne);
+        const avant=ligne.split(/jusqu['’]au/i)[0].trim().replace(/^[•*\-]+\s*/,"");
+        const morceaux=avant.split(/\s{2,}|\||>|	/).map(x=>x.trim()).filter(Boolean);
+        let joueur=null;
+        for(const morceau of [...morceaux].reverse()){
+            joueur=trouverJoueurCatalogueParNom(morceau);
+            if(joueur) break;
+        }
+        if(!joueur){
+            const bloc=[lignes[i-1]||"",ligne,lignes[i+1]||""].join(" ");
+            joueur=joueurs.find(j=>j.nom && bloc.toLowerCase().includes(String(j.nom).toLowerCase()))||null;
+        }
+        if(joueur) result.push({joueur,retour:date,texte:ligne});
+    }
 
-    // 1) Recherche directe joueur + "Jusqu'au" + date
+    // 2) Fallback robuste : on cherche directement chaque joueur du catalogue dans
+    // le document récupéré, puis une date « Jusqu'au » dans les caractères suivants.
+    // Cela fonctionne même si Jina transforme la page en Markdown et supprime les retours ligne.
+    const texteRecherche=normal.replace(/\s+/g," ");
+    const texteCle=cleNom(texteRecherche);
     for(const joueur of joueurs){
         if(!joueur || !joueur.nom) continue;
-
-        const nom = String(joueur.nom).trim();
-        if(!nom) continue;
-
-        const variantes = [
-            nom,
-            nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        ];
-
-        let idx = -1;
-
-        for(const variante of variantes){
-            idx = texteRecherche.toLowerCase().indexOf(variante.toLowerCase());
-            if(idx >= 0) break;
-        }
-
-        if(idx < 0) continue;
-
-        const apres = texteRecherche.slice(idx, idx + 500);
-
+        const nom=String(joueur.nom);
+        const nomCle=cleNom(nom);
+        const idx=texteCle.indexOf(nomCle);
+        if(idx<0) continue;
+        const apres=texteRecherche.slice(idx,idx+320);
         if(!/jusqu['’]au/i.test(apres)) continue;
-
-        const retour = extraireDateRetourPublic(apres);
-
-        if(!retour) continue;
-
-        result.push({
-            joueur,
-            retour,
-            texte: apres.slice(0, 300)
-        });
+        const date=extraireDateRetourPublic(apres);
+        if(date) result.push({joueur,retour:date,texte:apres.slice(0,260)});
     }
 
-    // 2) Recherche par lignes lorsque le snapshot conserve les retours ligne
-    const lignes = normal.split("\n")
-        .map(x => x.trim())
-        .filter(Boolean);
-
-    for(let i = 0; i < lignes.length; i++){
-        const ligne = lignes[i];
-
-        if(!/jusqu['’]au/i.test(ligne)) continue;
-
-        const date = extraireDateRetourPublic(ligne);
-
-        if(!date) continue;
-
-        const contexte = [
-            lignes[i - 2] || "",
-            lignes[i - 1] || "",
-            ligne,
-            lignes[i + 1] || "",
-            lignes[i + 2] || ""
-        ].join(" ");
-
-        for(const joueur of joueurs){
-            if(!joueur || !joueur.nom) continue;
-
-            const nom = String(joueur.nom).trim();
-
-            const variantes = [
-                nom,
-                nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            ];
-
-            const contexteMin = contexte.toLowerCase();
-
-            const trouve = variantes.some(v =>
-                contexteMin.includes(v.toLowerCase())
-            );
-
-            if(!trouve) continue;
-
-            result.push({
-                joueur,
-                retour: date,
-                texte: contexte.slice(0, 300)
-            });
-
-            break;
-        }
-    }
-
-    // 3) Dernier fallback : couples "nom + Jusqu'au date"
-    const re = /([^|<>]{2,120}?)\s+jusqu['’]au\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi;
-
+    // 3) Dernier fallback : extraire les couples « nom + Jusqu'au date » présents
+    // dans le texte et tenter un rapprochement exact avec le catalogue.
+    const re=/([^|<>]{2,100}?)\s+jusqu['’]au\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi;
     let m;
-
-    while((m = re.exec(normal))){
-        const fragment = m[1]
-            .trim()
-            .replace(/^[•*\-]+\s*/, "");
-
-        for(const joueur of joueurs){
-            if(!joueur || !joueur.nom) continue;
-
-            const nom = String(joueur.nom).trim();
-
-            const variantes = [
-                nom,
-                nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            ];
-
-            const fragmentMin = fragment.toLowerCase();
-
-            const trouve = variantes.some(v =>
-                fragmentMin.includes(v.toLowerCase())
-            );
-
-            if(!trouve) continue;
-
-            result.push({
-                joueur,
-                retour: extraireDateRetourPublic(m[0]),
-                texte: m[0]
-            });
-
-            break;
+    while((m=re.exec(normal))){
+        const fragment=m[1].trim().replace(/^[•*\-]+\s*/,"");
+        const morceaux=fragment.split(/\s{2,}/).map(x=>x.trim()).filter(Boolean);
+        for(const morceau of [...morceaux].reverse()){
+            const joueur=trouverJoueurCatalogueParNom(morceau);
+            if(joueur){
+                result.push({joueur,retour:extraireDateRetourPublic(m[0]),texte:m[0]});
+                break;
+            }
         }
     }
 
-    // Supprimer les doublons
-    const uniques = new Map();
-
-    result.forEach(x => {
-        if(!x || !x.joueur || !x.joueur.nom) return;
-
-        const k = cleNom(x.joueur.nom);
-
-        if(!uniques.has(k)){
-            uniques.set(k, x);
-        }
+    const uniques=new Map();
+    result.forEach(x=>{
+        const k=cleNom(x.joueur.nom);
+        if(!uniques.has(k)) uniques.set(k,x);
     });
-
     return [...uniques.values()];
 }
 
