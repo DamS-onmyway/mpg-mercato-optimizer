@@ -1149,56 +1149,42 @@ function slugFootDirect(nom){
 }
 
 function extraireCandidatsPublic(texte){
-    // Foot Direct peut être récupéré sous plusieurs formes : HTML, texte brut ou Markdown
-    // (notamment via r.jina.ai). Il ne faut donc pas dépendre d'une structure de lignes précise.
+    // Le snapshot GitHub contient le HTML brut de Foot Direct.
+    // On extrait directement les blocs joueur pour ne pas dépendre des balises
+    // HTML, des retours à la ligne ou de l'indexation après normalisation.
     const bruto=String(texte||"");
-    const normal=normaliserTextePublic(bruto);
-    const lignes=normal.split("\n").map(x=>x.trim()).filter(Boolean);
     const result=[];
 
-    // 1) Méthode classique : une ligne contient « Joueur Jusqu'au JJ/MM/AAAA ».
-    for(let i=0;i<lignes.length;i++){
-        const ligne=lignes[i];
-        if(!/jusqu['’]au/i.test(ligne)) continue;
-        const date=extraireDateRetourPublic(ligne);
-        const avant=ligne.split(/jusqu['’]au/i)[0].trim().replace(/^[•*\-]+\s*/,"");
-        const morceaux=avant.split(/\s{2,}|\||>|	/).map(x=>x.trim()).filter(Boolean);
-        let joueur=null;
-        for(const morceau of [...morceaux].reverse()){
-            joueur=trouverJoueurCatalogueParNom(morceau);
-            if(joueur) break;
+    // Cas nominal : structure Foot Direct .identity__title + .identity__subtitle.
+    try{
+        const doc=new DOMParser().parseFromString(bruto,"text/html");
+        const titres=[...doc.querySelectorAll(".identityList a .identity")];
+        for(const bloc of titres){
+            const titre=bloc.querySelector(".identity__title");
+            const sousTitre=bloc.querySelector(".identity__subtitle");
+            if(!titre || !sousTitre) continue;
+            const nom=normaliserTextePublic(titre.textContent).trim();
+            const info=normaliserTextePublic(sousTitre.textContent).trim();
+            if(!nom || !info) continue;
+            const joueur=trouverJoueurCatalogueParNom(nom);
+            if(!joueur) continue;
+            if(!/jusqu['’]au/i.test(info)) continue;
+            const date=extraireDateRetourPublic(info);
+            if(date) result.push({joueur,retour:date,texte:`${nom} ${info}`});
         }
-        if(!joueur){
-            const bloc=[lignes[i-1]||"",ligne,lignes[i+1]||""].join(" ");
-            joueur=joueurs.find(j=>j.nom && bloc.toLowerCase().includes(String(j.nom).toLowerCase()))||null;
-        }
-        if(joueur) result.push({joueur,retour:date,texte:ligne});
+    }catch(e){
+        console.warn("Extraction DOM indisponible, fallback texte",e);
     }
 
-    // 2) Fallback robuste : on cherche directement chaque joueur du catalogue dans
-    // le document récupéré, puis une date « Jusqu'au » dans les caractères suivants.
-    // Cela fonctionne même si Jina transforme la page en Markdown et supprime les retours ligne.
-    const texteRecherche=normal.replace(/\s+/g," ");
-    const texteCle=cleNom(texteRecherche);
-    for(const joueur of joueurs){
-        if(!joueur || !joueur.nom) continue;
-        const nom=String(joueur.nom);
-        const nomCle=cleNom(nom);
-        const idx=texteCle.indexOf(nomCle);
-        if(idx<0) continue;
-        const apres=texteRecherche.slice(idx,idx+320);
-        if(!/jusqu['’]au/i.test(apres)) continue;
-        const date=extraireDateRetourPublic(apres);
-        if(date) result.push({joueur,retour:date,texte:apres.slice(0,260)});
-    }
-
-    // 3) Dernier fallback : extraire les couples « nom + Jusqu'au date » présents
-    // dans le texte et tenter un rapprochement exact avec le catalogue.
-    const re=/([^|<>]{2,100}?)\s+jusqu['’]au\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi;
+    // Fallback texte/Markdown si le navigateur ne fournit pas DOMParser ou si
+    // la source n'a pas la structure HTML attendue.
+    const normal=normaliserTextePublic(bruto);
+    const texteSansBalises=normal.replace(/<[^>]*>/g," ").replace(/\s+/g," ");
+    const re=/([^|<>]{2,100}?)\s+jusqu['’]au\s+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/gi;
     let m;
-    while((m=re.exec(normal))){
+    while((m=re.exec(texteSansBalises))){
         const fragment=m[1].trim().replace(/^[•*\-]+\s*/,"");
-        const morceaux=fragment.split(/\s{2,}/).map(x=>x.trim()).filter(Boolean);
+        const morceaux=fragment.split(/\s{2,}|\s+•\s+/).map(x=>x.trim()).filter(Boolean);
         for(const morceau of [...morceaux].reverse()){
             const joueur=trouverJoueurCatalogueParNom(morceau);
             if(joueur){
