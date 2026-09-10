@@ -1142,66 +1142,6 @@ function slugFootDirect(nom){
 }
 
 function extraireCandidatsPublic(texte){
-    // Foot Direct peut être récupéré sous plusieurs formes : HTML, texte brut ou Markdown
-    // (notamment via r.jina.ai). Il ne faut donc pas dépendre d'une structure de lignes précise.
-    const bruto=String(texte||"");
-    const normal=normaliserTextePublic(bruto);
-    const lignes=normal.split("\n").map(x=>x.trim()).filter(Boolean);
-    const result=[];
-
-    // 1) Méthode classique : une ligne contient « Joueur Jusqu'au JJ/MM/AAAA ».
-    for(let i=0;i<lignes.length;i++){
-        const ligne=lignes[i];
-        if(!/jusqu['’]au/i.test(ligne)) continue;
-        const date=extraireDateRetourPublic(ligne);
-        const avant=ligne.split(/jusqu['’]au/i)[0].trim().replace(/^[•*\-]+\s*/,"");
-        const morceaux=avant.split(/\s{2,}|\||>|	/).map(x=>x.trim()).filter(Boolean);
-        let joueur=null;
-        for(const morceau of [...morceaux].reverse()){
-            joueur=trouverJoueurCatalogueParNom(morceau);
-            if(joueur) break;
-        }
-        if(!joueur){
-            const bloc=[lignes[i-1]||"",ligne,lignes[i+1]||""].join(" ");
-            joueur=joueurs.find(j=>j.nom && bloc.toLowerCase().includes(String(j.nom).toLowerCase()))||null;
-        }
-        if(joueur) result.push({joueur,retour:date,texte:ligne});
-    }
-
-    // 2) Fallback robuste : on cherche directement chaque joueur du catalogue dans
-    // le document récupéré, puis une date « Jusqu'au » dans les caractères suivants.
-    // Cela fonctionne même si Jina transforme la page en Markdown et supprime les retours ligne.
-    const texteRecherche=normal.replace(/\s+/g," ");
-    const texteCle=cleNom(texteRecherche);
-    for(const joueur of joueurs){
-        if(!joueur || !joueur.nom) continue;
-        const nom=String(joueur.nom);
-        const nomCle=cleNom(nom);
-        const idx=texteCle.indexOf(nomCle);
-        if(idx<0) continue;
-        const apres=texteRecherche.slice(idx,idx+320);
-        if(!/jusqu['’]au/i.test(apres)) continue;
-        const date=extraireDateRetourPublic(apres);
-        if(date) result.push({joueur,retour:date,texte:apres.slice(0,260)});
-    }
-
-    // 3) Dernier fallback : extraire les couples « nom + Jusqu'au date » présents
-    // dans le texte et tenter un rapprochement exact avec le catalogue.
-    const re=/([^|<>]{2,100}?)\s+jusqu['’]au\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi;
-    let m;
-    while((m=re.exec(normal))){
-        const fragment=m[1].trim().replace(/^[•*\-]+\s*/,"");
-        const morceaux=fragment.split(/\s{2,}/).map(x=>x.trim()).filter(Boolean);
-        for(const morceau of [...morceaux].reverse()){
-            const joueur=trouverJoueurCatalogueParNom(morceau);
-            if(joueur){
-                result.push({joueur,retour:extraireDateRetourPublic(m[0]),texte:m[0]});
-                break;
-            }
-        }
-    }
-
-function extraireCandidatsPublic(texte){
     const bruto = String(texte || "");
     const normal = normaliserTextePublic(bruto);
     const result = [];
@@ -1349,7 +1289,6 @@ function extraireCandidatsPublic(texte){
     });
 
     return [...uniques.values()];
-}
 }
 
 async function recupererSourceBlessures(url){
